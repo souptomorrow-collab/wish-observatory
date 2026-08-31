@@ -444,8 +444,9 @@ footer{margin-top:60px; font-size:12px; color:var(--ink3); text-align:center; li
   <div class="card data-sec">
     <h3>Google 雲端同步</h3>
     <p>把<b>所有帳號</b>的紀錄備份到你自己的 Google 雲端硬碟。使用「應用程式資料夾」授權 — 本工具只能存取自己建立的隱藏資料夾,看不到你雲端裡的任何其他檔案。換電腦或換瀏覽器時按「從雲端還原」即可接續。</p>
+    <p>授權設定已內建,直接按「上傳備份到雲端」登入 Google 即可(帳號需在站方的測試使用者名單內);授權畫面出現「未驗證」警告屬正常,點「繼續」即可。</p>
     <div style="margin-bottom:10px">
-      <input type="text" id="gClientId" class="txt" style="width:100%" placeholder="貼上你的 Google OAuth Client ID(xxxx.apps.googleusercontent.com)" aria-label="Google OAuth Client ID">
+      <input type="text" id="gClientId" class="txt" style="width:100%" placeholder="(選填)自訂 OAuth Client ID — 自架時才需要" aria-label="自訂 Google OAuth Client ID">
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn primary" id="gUploadBtn">上傳備份到雲端</button>
@@ -453,7 +454,7 @@ footer{margin-top:60px; font-size:12px; color:var(--ink3); text-align:center; li
     </div>
     <p id="gStatus" style="font-size:12.5px;color:var(--ink3);margin:10px 0 0"></p>
     <details class="model">
-      <summary>第一次使用?建立 Client ID 的步驟(約 5 分鐘,免費)</summary>
+      <summary>進階:自架網站時建立自己的 Client ID(約 5 分鐘,免費)</summary>
       <ol style="margin:8px 0 0;padding-left:20px;line-height:2">
         <li><a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noopener" style="color:var(--blue)">建立專案</a>(名稱隨意,建好後記得右上角切到這個專案)</li>
         <li><a href="https://console.cloud.google.com/apis/library/drive.googleapis.com" target="_blank" rel="noopener" style="color:var(--blue)">啟用 Google Drive API</a>(點藍色「啟用」鈕)</li>
@@ -1819,6 +1820,7 @@ document.addEventListener('keydown', e=>{
 
 /* ═══════════════════ Google 雲端同步 ═══════════════════ */
 const G_KEY = 'wish-observatory-gsync';
+const G_DEFAULT_CID = '922524754551-t9jgkp8pa2bhntaor7v0ufph5tvpugnn.apps.googleusercontent.com';
 let gCfg = {};
 try{ gCfg = JSON.parse(localStorage.getItem(G_KEY)||'{}'); }catch(e){}
 let gToken = null;
@@ -1836,8 +1838,7 @@ function loadGis(){
 }
 function getGToken(){
   return new Promise((res, rej)=>{
-    const cid = document.getElementById('gClientId').value.trim();
-    if(!cid){ rej(new Error('請先貼上 Client ID(展開下方步驟說明)')); return; }
+    const cid = document.getElementById('gClientId').value.trim() || G_DEFAULT_CID;
     gCfg.clientId = cid; gSave();
     if(gToken && gToken.exp > Date.now()+60000) return res(gToken.t);
     loadGis().then(()=>{
@@ -1928,10 +1929,8 @@ async function gDownloadRun(){
 }
 document.getElementById('gUploadBtn').onclick = gUploadRun;
 document.getElementById('gDownloadBtn').onclick = gDownloadRun;
-if(gCfg.clientId){
-  document.getElementById('gClientId').value = gCfg.clientId;
-  loadGis().catch(()=>{});  // 預載,讓授權彈窗保有點擊手勢
-}
+document.getElementById('gClientId').value = gCfg.clientId || G_DEFAULT_CID;
+loadGis().catch(()=>{});  // 預載,讓授權彈窗保有點擊手勢
 if(gCfg.lastSync) gStatus('上次上傳:'+gCfg.lastSync);
 
 /* ═══════════════════ 自動匯入(連結本機紀錄檔) ═══════════════════ */
