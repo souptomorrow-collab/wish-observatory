@@ -1857,6 +1857,18 @@ function getGToken(forceSelect){
     }).catch(rej);
   });
 }
+async function gWho(token){
+  if(gToken && gToken.who) return gToken.who;
+  try{
+    const r = await fetch('https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)',
+      {headers:{Authorization:'Bearer '+token}});
+    const j = await r.json();
+    const who = (j.user && j.user.emailAddress) || '';
+    if(gToken) gToken.who = who;
+    if(who){ gCfg.email = who; gSave(); }
+    return who;
+  }catch(e){ return gCfg.email || ''; }
+}
 async function gFind(token){
   const r = await fetch("https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name%3D'wish-observatory-backup.json'&fields=files(id,modifiedTime)",
     {headers:{Authorization:'Bearer '+token}});
@@ -1909,8 +1921,9 @@ async function gUploadRun(){
     const j = await r.json();
     if(j.error) throw new Error(j.error.message);
     gCfg.lastSync = nowStr(); gSave();
-    gStatus('上次上傳:'+gCfg.lastSync);
-    toast('已上傳到你的 Google 雲端');
+    const who = await gWho(token);
+    gStatus((who? '帳號 '+who+' · ':'')+'上次上傳:'+gCfg.lastSync);
+    toast('已上傳到'+(who? ' '+who : '你的 Google')+' 的雲端');
   }catch(e){ gStatus('✗ '+e.message); toast('上傳失敗:'+e.message); }
 }
 async function gDownloadRun(){
@@ -1924,7 +1937,8 @@ async function gDownloadRun(){
       {headers:{Authorization:'Bearer '+token}});
     const j = await r.json();
     fullRestore(j);
-    gStatus('已還原雲端備份(雲端版本時間:'+String(found.modifiedTime||'').slice(0,16).replace('T',' ')+')');
+    const who = await gWho(token);
+    gStatus((who? '帳號 '+who+' · ':'')+'已還原雲端備份(雲端版本時間:'+String(found.modifiedTime||'').slice(0,16).replace('T',' ')+')');
     toast('已從雲端還原全部帳號資料');
   }catch(e){ gStatus('✗ '+e.message); toast('還原失敗:'+e.message); }
 }
@@ -1934,14 +1948,15 @@ document.getElementById('gSwitchBtn').onclick = async ()=>{
   try{
     gStatus('選擇要使用的 Google 帳號…');
     gToken = null;
-    await getGToken(true);
-    gStatus('已切換帳號 — 接著按「上傳」或「從雲端還原」都會作用在新帳號');
-    toast('已切換 Google 帳號');
+    const t = await getGToken(true);
+    const who = await gWho(t);
+    gStatus('已切換到 '+(who||'新帳號')+' — 接著按「上傳」或「從雲端還原」');
+    toast('已切換到 '+(who||'新帳號'));
   }catch(e){ gStatus('✗ '+e.message); }
 };
 document.getElementById('gClientId').value = gCfg.clientId || G_DEFAULT_CID;
 loadGis().catch(()=>{});  // 預載,讓授權彈窗保有點擊手勢
-if(gCfg.lastSync) gStatus('上次上傳:'+gCfg.lastSync);
+if(gCfg.lastSync || gCfg.email) gStatus((gCfg.email? '帳號 '+gCfg.email+' · ':'')+(gCfg.lastSync? '上次上傳:'+gCfg.lastSync:''));
 
 /* ═══════════════════ 自動匯入(連結本機紀錄檔) ═══════════════════ */
 let fsHandle = null, fsTimer = null, fsLastMod = 0;
