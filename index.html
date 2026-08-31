@@ -417,6 +417,16 @@ footer{margin-top:60px; font-size:12px; color:var(--ink3); text-align:center; li
   </div>
 
   <div class="card data-sec">
+    <h3>自動匯入</h3>
+    <p>先雙擊資料夾裡的「<b>安裝自動抓取</b>」(每 30 分鐘在背景抓一次官方紀錄),再按下面的按鈕連結到 <b>祈願紀錄-UIGF.json</b> — 之後只要這個頁面開著,就會每分鐘自動檢查並合併新紀錄,完全不用動手。官方歷史本身有 10 分鐘~1 小時延遲;要零延遲請搭配追蹤頁的手動記錄。</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn primary" id="fsLinkBtn">連結紀錄檔</button>
+      <button class="btn" id="fsResumeBtn" hidden>恢復連結</button>
+    </div>
+    <p id="fsStatus" style="font-size:12.5px;color:var(--ink3);margin:10px 0 0"></p>
+  </div>
+
+  <div class="card data-sec">
     <h3>備份與還原</h3>
     <p>所有資料只儲存在這個瀏覽器的 localStorage,不會上傳到任何伺服器。換裝置前請先備份。</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
@@ -671,7 +681,8 @@ function nowStr(){
 
 /* ═══════════════════ UIGF 匯入(依 id 合併累積) ═══════════════════ */
 function idCmp(a,b){ const x=a.id, y=b.id; return x.length!==y.length ? x.length-y.length : (x<y?-1:x>y?1:0); }
-function importUIGF(json){
+function importUIGF(json, opts){
+  opts = opts || {};
   let profiles = [];
   if(json && json.hk4e && Array.isArray(json.hk4e)){          // v4
     profiles = json.hk4e.map(p=>({uid:String(p.uid||''), list:p.list||[], tz:p.timezone, lang:p.lang}));
@@ -679,13 +690,16 @@ function importUIGF(json){
     profiles = [{uid:String((json.info&&json.info.uid)||''), list:json.list,
       tz:(json.info&&json.info.region_time_zone), lang:(json.info&&json.info.lang)}];
   }else{
-    toast('無法辨識的格式:不是 UIGF JSON'); return;
+    if(!opts.quiet) toast('無法辨識的格式:不是 UIGF JSON');
+    return;
   }
   profiles = profiles.filter(p=>p.list && p.list.length);
-  if(!profiles.length){ toast('檔案裡沒有祈願紀錄'); return; }
+  if(!profiles.length){ if(!opts.quiet) toast('檔案裡沒有祈願紀錄'); return; }
   const prof = profiles.reduce((a,b)=> (b.list.length>a.list.length? b:a));  // 取紀錄最多的帳號
-  if(state.uid && prof.uid && state.uid!==prof.uid &&
-     !confirm('這份檔案的 UID('+prof.uid+')與目前資料(UID '+state.uid+')不同,仍要合併匯入嗎?')) return;
+  if(state.uid && prof.uid && state.uid!==prof.uid){
+    if(opts.quiet) return;
+    if(!confirm('這份檔案的 UID('+prof.uid+')與目前資料(UID '+state.uid+')不同,仍要合併匯入嗎?')) return;
+  }
 
   // 先比對出真正的新紀錄
   state.raw = state.raw||{};
@@ -701,7 +715,7 @@ function importUIGF(json){
       {id, gt, ty:it.item_type||'', name:it.name||'', rank:Number(it.rank_type)||3, time:String(it.time||'')});
     added++;
   });
-  if(!added){ toast('沒有新紀錄'+(dup?'('+dup+' 筆已存在)':'')); return; }
+  if(!added){ if(!opts.quiet) toast('沒有新紀錄'+(dup?'('+dup+' 筆已存在)':'')); return; }
 
   snapshot();
   state.uid = prof.uid || state.uid;
@@ -1854,6 +1868,94 @@ if(gCfg.clientId){
   loadGis().catch(()=>{});  // 預載,讓授權彈窗保有點擊手勢
 }
 if(gCfg.lastSync) gStatus('上次上傳:'+gCfg.lastSync);
+
+/* ═══════════════════ 自動匯入(連結本機紀錄檔) ═══════════════════ */
+let fsHandle = null, fsTimer = null, fsLastMod = 0;
+function setFsStatus(msg){ const el = document.getElementById('fsStatus'); if(el) el.textContent = msg; }
+function showFsResume(v){ document.getElementById('fsResumeBtn').hidden = !v; }
+function stripBom(s){ return s.charCodeAt(0)===65279 ? s.slice(1) : s; }
+function fsDb(){
+  return new Promise((res, rej)=>{
+    const r = indexedDB.open('wish-observatory-fs', 1);
+    r.onupgradeneeded = ()=>r.result.createObjectStore('kv');
+    r.onsuccess = ()=>res(r.result);
+    r.onerror = ()=>rej(r.error);
+  });
+}
+async function fsSaveHandle(h){
+  const db = await fsDb();
+  await new Promise((res, rej)=>{
+    const tx = db.transaction('kv', 'readwrite');
+    tx.objectStore('kv').put(h, 'handle');
+    tx.oncomplete = res; tx.onerror = ()=>rej(tx.error);
+  });
+}
+async function fsLoadHandle(){
+  try{
+    const db = await fsDb();
+    return await new Promise(res=>{
+      const rq = db.transaction('kv').objectStore('kv').get('handle');
+      rq.onsuccess = ()=>res(rq.result || null);
+      rq.onerror = ()=>res(null);
+    });
+  }catch(e){ return null; }
+}
+function stopFsTimer(){ if(fsTimer){ clearInterval(fsTimer); fsTimer = null; } }
+function startFsTimer(){ stopFsTimer(); fsTimer = setInterval(()=>fsCheck(false), 60000); }
+async function fsCheck(force){
+  if(!fsHandle) return;
+  try{
+    const f = await fsHandle.getFile();
+    if(!force && f.lastModified===fsLastMod) return;
+    fsLastMod = f.lastModified;
+    const j = JSON.parse(stripBom(await f.text()));
+    importUIGF(j, {quiet:true});
+    setFsStatus('監看中 · 上次檢查 '+nowStr());
+  }catch(e){
+    setFsStatus('✗ 讀取失敗:'+e.message);
+    showFsResume(true);
+    stopFsTimer();
+  }
+}
+async function fsLink(){
+  try{
+    if(!window.showOpenFilePicker) throw new Error('此瀏覽器不支援檔案連結,請用桌面版 Chrome / Edge');
+    const picked = await window.showOpenFilePicker({
+      types:[{description:'UIGF JSON', accept:{'application/json':['.json']}}]
+    });
+    fsHandle = picked[0];
+    await fsSaveHandle(fsHandle);
+    showFsResume(false);
+    startFsTimer();
+    await fsCheck(true);
+    toast('已連結 '+fsHandle.name+',每分鐘自動檢查更新');
+  }catch(e){ if(e.name!=='AbortError') setFsStatus('✗ '+e.message); }
+}
+async function fsResume(){
+  if(!fsHandle){ setFsStatus('尚未連結紀錄檔'); return; }
+  try{
+    const p = await fsHandle.requestPermission({mode:'read'});
+    if(p==='granted'){ showFsResume(false); startFsTimer(); await fsCheck(true); }
+    else setFsStatus('未授權,自動匯入未啟動');
+  }catch(e){ setFsStatus('✗ '+e.message); }
+}
+document.getElementById('fsLinkBtn').onclick = fsLink;
+document.getElementById('fsResumeBtn').onclick = fsResume;
+(async ()=>{
+  if(!window.showOpenFilePicker){
+    setFsStatus('此瀏覽器不支援自動匯入,請用桌面版 Chrome / Edge 開啟線上版');
+    return;
+  }
+  fsHandle = await fsLoadHandle();
+  if(!fsHandle){ setFsStatus('尚未連結紀錄檔'); return; }
+  let p = 'prompt';
+  try{ p = await fsHandle.queryPermission({mode:'read'}); }catch(e){}
+  if(p==='granted'){ startFsTimer(); fsCheck(true); setFsStatus('已連結「'+(fsHandle.name||'紀錄檔')+'」· 監看中'); }
+  else{
+    showFsResume(true);
+    setFsStatus('找到先前連結的「'+(fsHandle.name||'紀錄檔')+'」— 按「恢復連結」繼續自動匯入');
+  }
+})();
 
 /* ═══════════════════ 星空背景 ═══════════════════ */
 (function(){

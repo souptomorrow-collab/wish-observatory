@@ -4,6 +4,7 @@
 #        向米哈遊官方 API 抓取完整紀錄。authkey 只會傳給官方伺服器。
 #  使用前:先在遊戲裡打開 祈願 → 查看歷史紀錄 (24 小時內有效)
 # ══════════════════════════════════════════════════════════════
+param([switch]$Silent)   # -Silent:排程背景模式,不暫停等待、結果寫入 fetch.log
 $ErrorActionPreference = 'Stop'
 function Read-SharedText($path){
   # 遊戲執行中會鎖住檔案,用共享模式讀取
@@ -14,6 +15,10 @@ function Read-SharedText($path){
   return [Text.Encoding]::UTF8.GetString($bytes)
 }
 function Fail($msg){
+  if($Silent){
+    "$(Get-Date -Format 'yyyy-MM-dd HH:mm') FAIL $msg" | Add-Content -Path (Join-Path $PSScriptRoot 'fetch.log')
+    exit 1
+  }
   Write-Host ''
   Write-Host "[X] $msg" -ForegroundColor Red
   Read-Host '按 Enter 關閉'
@@ -151,5 +156,9 @@ $json = ConvertTo-Json -InputObject $export -Depth 8 -Compress
 Write-Host ''
 Write-Host ('[OK] 完成!共 {0} 筆,UID {1}' -f $all.Count, $uid) -ForegroundColor Green
 Write-Host ('檔案已存到:{0}' -f $out)
-Write-Host '打開「祈願觀測站」的 資料 分頁,把這個檔案拖進去就匯入完成了。'
-Read-Host '按 Enter 關閉'
+if($Silent){
+  "$(Get-Date -Format 'yyyy-MM-dd HH:mm') OK $($all.Count) 筆" | Add-Content -Path (Join-Path $PSScriptRoot 'fetch.log')
+}else{
+  Write-Host '打開「祈願觀測站」的 資料 分頁,把這個檔案拖進去就匯入完成了。'
+  Read-Host '按 Enter 關閉'
+}

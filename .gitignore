@@ -2,6 +2,9 @@
 祈願紀錄*.json
 *-UIGF.json
 
+# 排程抓取的執行紀錄
+fetch.log
+
 # 系統雜項
 Thumbs.db
 Desktop.ini
