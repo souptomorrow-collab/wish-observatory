@@ -274,7 +274,7 @@ footer{margin-top:60px; font-size:12px; color:var(--ink3); text-align:center; li
   <div class="hero" id="hero"></div>
   <div class="grid" id="bannerGrid"></div>
   <p style="font-size:12.5px;color:var(--ink3);margin-top:14px">
-    小技巧:每抽完就按「+1 / +10」累積抽數;出金或出紫再按對應按鈕結算。也可以到「資料」頁一次匯入 UIGF 紀錄。按「復原」可撤銷上一步。<br>
+    建議流程:<b>剛抽完先在這裡手動記</b>(官方歷史紀錄有 10 分鐘~1 小時延遲),之後再到「資料」頁匯入官方紀錄 — 系統會以官方資料校正重算,並自動保留比官方更新的手動紀錄,不會重複也不會遺失。按「復原」可撤銷上一步。<br>
     鍵盤快捷鍵(角色池):<b>1</b> 加一抽 · <b>0</b> 加十抽 · <b>4</b> 出四星 · <b>5</b> 出五星 · <b>Z</b> 復原
   </p>
 </section>
@@ -537,7 +537,7 @@ function blankBanner(){ return {pity5:0, pity4:0, guaranteed:false, radiance:0, 
 function blankState(){
   const banners = {};
   BANNERS.forEach(b=>banners[b.key]=blankBanner());
-  return {uid:'', banners, monthly:{}, raw:{}, stdChars:[], tz:8, lang:'zh-tw', updated:0};
+  return {uid:'', banners, monthly:{}, raw:{}, manual:{}, stdChars:[], tz:8, lang:'zh-tw', updated:0};
 }
 /* 多帳號:meta 記錄有哪些帳號與目前使用中的那個,各帳號資料存在各自的 key */
 const META_KEY = 'wish-observatory-meta';
@@ -564,6 +564,7 @@ function load(){
     BANNERS.forEach(b=>{ s.banners[b.key] = Object.assign(blankBanner(), s.banners[b.key]||{}); });
     s.monthly = s.monthly||{};
     s.raw = s.raw||{};
+    s.manual = s.manual||{};
     s.stdChars = s.stdChars||[];
     s.uid = s.uid||'';
     return s;
@@ -591,10 +592,16 @@ function bumpMonthly(key, n, when){
 }
 
 /* ═══════════════════ 手動記錄 ═══════════════════ */
+// 手動事件帳:匯入官方紀錄重算時,比官方最新一筆更新的手動事件會被保留重放
+function mlog(key, ev){
+  state.manual = state.manual||{};
+  (state.manual[key] = state.manual[key]||[]).push(ev);
+}
 function addPulls(key, n){
   snapshot();
   const b = state.banners[key];
   b.pity5 += n; b.pity4 += n; b.total += n;
+  mlog(key, {t:'p', n, time:nowStr()});
   bumpMonthly(key, n);
   save(); renderAll();
 }
@@ -602,8 +609,10 @@ function log4(key){
   snapshot();
   const b = state.banners[key];
   const pity = b.pity4 + 1;
+  const tm = nowStr();
   b.pity4 = 0; b.pity5 += 1; b.total += 1;
-  b.records.push({id:Date.now()+''+Math.random().toString(36).slice(2,6), name:'', rarity:4, pity, result:null, time:nowStr(), src:'manual'});
+  b.records.push({id:Date.now()+''+Math.random().toString(36).slice(2,6), name:'', rarity:4, pity, result:null, time:tm, src:'manual'});
+  mlog(key, {t:'4', time:tm});
   bumpMonthly(key, 1);
   save(); renderAll(); toast('已記錄四星(第 '+pity+' 抽)');
 }
@@ -646,8 +655,10 @@ function save5(){
     if(result==='lose'){ b.guaranteed = true; if(key==='character') b.radiance += 1; }
     else { b.guaranteed = false; if(key==='character') b.radiance = 0; }
   }
+  const tm = nowStr();
   b.records.push({id:Date.now()+''+Math.random().toString(36).slice(2,6), name, rarity:5, pity,
-    result:(result==='radiance'?'win':result), via:result, time:nowStr(), src:'manual'});
+    result:(result==='radiance'?'win':result), via:result, time:tm, src:'manual'});
+  mlog(key, {t:'5', name, result, time:tm});
   bumpMonthly(key, 1);
   document.getElementById('dlg5').close();
   save(); renderAll();
@@ -729,6 +740,32 @@ function rebuildBanner(key){
       }
       b.records.push({id:it.id, name:it.name, ty:it.ty, rarity:5, pity:b.pity5, result, via, time:it.time.slice(0,16), src:'import'});
       b.pity5 = 0;
+    }
+  });
+  // 重放比官方最新一筆更新的手動事件(官方歷史有延遲,剛抽完的手動紀錄不會被洗掉)
+  const lastRaw = items.length ? items[items.length-1].time : '';
+  const pend = ((state.manual||{})[key]||[]).filter(ev=>ev.time > lastRaw);
+  if(state.manual) state.manual[key] = pend;
+  pend.forEach(ev=>{
+    if(ev.t==='p'){
+      b.pity5 += ev.n; b.pity4 += ev.n; b.total += ev.n;
+      bumpMonthly(key, ev.n, ev.time);
+    }else if(ev.t==='4'){
+      const pity = b.pity4 + 1;
+      b.pity4 = 0; b.pity5 += 1; b.total += 1;
+      b.records.push({id:'m'+ev.time+Math.random().toString(36).slice(2,5), name:'', rarity:4, pity, result:null, time:ev.time, src:'manual'});
+      bumpMonthly(key, 1, ev.time);
+    }else if(ev.t==='5'){
+      const pity = b.pity5 + 1;
+      b.pity5 = 0; b.pity4 += 1; b.total += 1;
+      const res = ev.result;
+      if(banner.has5050 && res){
+        if(res==='lose'){ b.guaranteed = true; if(key==='character') b.radiance += 1; }
+        else { b.guaranteed = false; if(key==='character') b.radiance = 0; }
+      }
+      b.records.push({id:'m'+ev.time+Math.random().toString(36).slice(2,5), name:ev.name||'', rarity:5, pity,
+        result:(res==='radiance'?'win':res), via:res, time:ev.time, src:'manual'});
+      bumpMonthly(key, 1, ev.time);
     }
   });
 }
@@ -1310,6 +1347,7 @@ function setupData(){
       BANNERS.forEach(b=>{ state.banners[b.key] = Object.assign(blankBanner(), state.banners[b.key]||{}); });
       state.monthly = state.monthly||{};
       state.raw = state.raw||{};
+      state.manual = state.manual||{};
       state.stdChars = state.stdChars||[];
       save(); renderAll(); toast('還原成功');
     }catch(e){ toast('還原失敗:'+e.message); }
