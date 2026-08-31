@@ -1,0 +1,1718 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="原神祈願追蹤工具:保底計數、捕獲明光、UIGF 匯入匯出、統計圖表、抽卡規劃與模擬器。純前端、資料只存本機。">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌠</text></svg>">
+<title>祈願觀測站</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;800&family=Noto+Serif+TC:wght@700;900&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+:root{
+  --night:#0d1124; --surface:#151b33; --raised:#1c2342; --line:#2a3154;
+  --ink:#eae8f4; --ink2:#a9a7c6; --ink3:#716f90;
+  --gold:#e6b34c; --gold-bright:#ffd166; --gold-chart:#b9871f;
+  --purple:#a878e8; --purple-chart:#8a55dd;
+  --blue:#7db4ee; --blue-chart:#4f97e6;
+  --win:#4cc38a; --lose:#e0637a;
+  --radius:12px;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+body{
+  margin:0; background:var(--night); color:var(--ink);
+  font-family:'Noto Sans TC',-apple-system,'Microsoft JhengHei',sans-serif;
+  font-size:15px; line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+}
+#sky{position:fixed; inset:0; z-index:0; pointer-events:none}
+.app{position:relative; z-index:1; max-width:1080px; margin:0 auto; padding:0 20px 80px}
+
+/* ---------- header ---------- */
+header.masthead{padding:44px 0 8px; display:flex; align-items:baseline; gap:16px; flex-wrap:wrap}
+.wordmark{font-family:'Noto Serif TC',serif; font-weight:900; font-size:clamp(26px,4vw,36px); letter-spacing:.06em; margin:0;
+  background:linear-gradient(105deg,#f3e3b8, var(--gold-bright) 45%, #caa04a); -webkit-background-clip:text; background-clip:text; color:transparent;}
+.wordmark-en{font-family:Cinzel,serif; font-weight:700; font-size:12px; letter-spacing:.42em; color:var(--ink3); text-transform:uppercase}
+.uid-tag{margin-left:auto; font-size:12px; color:var(--ink3); font-variant-numeric:tabular-nums}
+#profileSel{font:inherit; font-size:12.5px; background:var(--surface); color:var(--ink2);
+  border:1px solid var(--line); border-radius:8px; padding:4px 10px; cursor:pointer}
+#profileSel:focus-visible{outline:2px solid var(--gold); outline-offset:1px}
+
+/* ---------- luck & 4-star rank & timeline ---------- */
+.luck-verdict{display:flex; gap:20px; align-items:center; flex-wrap:wrap}
+.luck-badge{font-family:'Noto Serif TC',serif; font-weight:900; font-size:28px; letter-spacing:.14em;
+  color:var(--gold-bright); border:1px solid rgba(230,179,76,.4); background:rgba(230,179,76,.07);
+  border-radius:12px; padding:12px 20px; flex:none}
+.luck-text{flex:1; min-width:220px; font-size:14px; color:var(--ink2); line-height:1.8}
+.luck-text b{color:var(--gold-bright); font-variant-numeric:tabular-nums}
+.r4row{display:flex; align-items:center; gap:12px; margin:6px 0}
+.r4name{width:110px; flex:none; font-size:13px; color:var(--ink2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:right}
+.r4track{flex:1; height:12px; background:var(--night); border-radius:4px; overflow:hidden}
+.r4bar{height:100%; background:var(--purple-chart); border-radius:4px}
+.r4cnt{width:36px; font-size:12.5px; color:var(--ink); font-variant-numeric:tabular-nums}
+.ms-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:2px 26px}
+.ms-item{display:flex; justify-content:space-between; align-items:baseline; gap:12px; font-size:13.5px;
+  border-bottom:1px solid rgba(42,49,84,.5); padding:8px 0}
+.ms-item span{color:var(--ink3)}
+.ms-item b{color:var(--ink); font-variant-numeric:tabular-nums; text-align:right}
+#gmOut b{color:var(--gold-bright); font-variant-numeric:tabular-nums}
+
+/* ---------- share card ---------- */
+.share-overlay{position:fixed; inset:0; z-index:40; background:rgba(5,7,16,.86); backdrop-filter:blur(4px);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:20px; overflow:auto}
+.share-card{width:340px; max-width:92vw; position:relative; overflow:hidden;
+  background:linear-gradient(165deg, #1e2547, #0d1124 62%);
+  border:1px solid rgba(230,179,76,.5); border-radius:18px; padding:26px 26px 18px;
+  box-shadow:0 20px 60px rgba(0,0,0,.55)}
+.sc-star{position:absolute; color:var(--gold); opacity:.28; font-size:13px; pointer-events:none}
+.sc-head{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:18px}
+.sc-head b{font-family:'Noto Serif TC',serif; font-weight:900; letter-spacing:.1em; font-size:15px;
+  background:linear-gradient(105deg,#f3e3b8, var(--gold-bright)); -webkit-background-clip:text; background-clip:text; color:transparent}
+.sc-head span{font-size:10.5px; letter-spacing:.3em; color:var(--ink3); font-family:Cinzel,serif}
+.sc-tier{text-align:center; margin:6px 0 2px; font-family:'Noto Serif TC',serif; font-weight:900;
+  font-size:44px; letter-spacing:.18em; color:var(--gold-bright); text-shadow:0 0 24px rgba(255,209,102,.35)}
+.sc-beat{text-align:center; font-size:12.5px; color:var(--ink2); margin-bottom:18px}
+.sc-row{display:flex; justify-content:space-between; align-items:baseline; gap:12px; font-size:13px;
+  padding:7px 0; border-bottom:1px solid rgba(42,49,84,.6)}
+.sc-row span{color:var(--ink3)}
+.sc-row b{color:var(--ink); font-weight:500; font-variant-numeric:tabular-nums; text-align:right}
+.sc-foot{margin-top:14px; text-align:center; font-size:10.5px; color:var(--ink3); letter-spacing:.08em}
+.share-actions{display:flex; gap:14px; align-items:center; font-size:13px; color:var(--ink2)}
+
+/* ---------- tabs ---------- */
+nav.tabs{position:sticky; top:0; z-index:5; display:flex; gap:6px; padding:14px 0 12px; margin-bottom:20px;
+  background:linear-gradient(to bottom, var(--night) 78%, transparent);}
+nav.tabs button{
+  appearance:none; border:1px solid transparent; background:transparent; color:var(--ink2);
+  font:inherit; font-weight:500; padding:8px 18px; border-radius:999px; cursor:pointer; letter-spacing:.05em;
+}
+nav.tabs button:hover{color:var(--ink); background:var(--surface)}
+nav.tabs button[aria-selected="true"]{color:var(--gold-bright); background:var(--surface); border-color:var(--line)}
+nav.tabs button:focus-visible, .btn:focus-visible, .chip:focus-visible{outline:2px solid var(--gold); outline-offset:2px}
+
+/* ---------- hero ---------- */
+.hero{display:flex; gap:32px; align-items:center; padding:26px 30px; margin-bottom:22px;
+  background:linear-gradient(150deg, var(--raised), var(--surface) 65%); border:1px solid var(--line); border-radius:18px; flex-wrap:wrap}
+.ring-wrap{position:relative; width:150px; height:150px; flex:none}
+.ring-wrap svg{transform:rotate(-90deg)}
+.ring-bg{stroke:var(--line)}
+.ring-fg{stroke:var(--gold); transition:stroke-dashoffset .5s ease, stroke .3s}
+.ring-fg.hot{stroke:var(--gold-bright); filter:drop-shadow(0 0 6px rgba(255,209,102,.55))}
+.ring-num{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center}
+.ring-num b{font-family:Cinzel,serif; font-weight:800; font-size:44px; line-height:1; color:var(--ink); font-variant-numeric:tabular-nums}
+.ring-num span{font-size:11px; letter-spacing:.3em; color:var(--ink3); margin-top:4px}
+.hero-info{flex:1; min-width:230px}
+.hero-info h2{font-family:'Noto Serif TC',serif; font-weight:700; font-size:18px; margin:0 0 8px; letter-spacing:.08em}
+.hero-line{color:var(--ink2); font-size:14px; margin:2px 0}
+.hero-line b{color:var(--gold-bright); font-variant-numeric:tabular-nums}
+.badges{display:flex; gap:8px; margin-top:14px; flex-wrap:wrap}
+.badge{font-size:12px; padding:4px 12px; border-radius:999px; border:1px solid var(--line); color:var(--ink2); letter-spacing:.05em}
+.badge.gold{color:var(--gold-bright); border-color:rgba(230,179,76,.45); background:rgba(230,179,76,.08)}
+.badge.dim{opacity:.75}
+.radiance-dots{display:inline-flex; gap:4px; margin-left:6px; vertical-align:middle}
+.radiance-dots i{width:8px; height:8px; border-radius:50%; background:var(--line); display:inline-block}
+.radiance-dots i.on{background:var(--gold-bright); box-shadow:0 0 5px rgba(255,209,102,.7)}
+
+/* ---------- cards ---------- */
+.grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px}
+.card{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:20px 22px}
+.card h3{margin:0 0 4px; font-family:'Noto Serif TC',serif; font-weight:700; font-size:16px; letter-spacing:.1em}
+.card .sub{font-size:12px; color:var(--ink3); margin-bottom:14px}
+.meter{margin:10px 0 4px}
+.meter .m-label{display:flex; justify-content:space-between; font-size:12px; color:var(--ink2); margin-bottom:4px}
+.meter .m-label b{font-variant-numeric:tabular-nums; color:var(--ink)}
+.m-track{height:6px; border-radius:3px; background:var(--night); overflow:hidden}
+.m-fill{height:100%; border-radius:3px; transition:width .4s ease}
+.m-fill.g5{background:linear-gradient(90deg, var(--gold-chart), var(--gold))}
+.m-fill.g4{background:linear-gradient(90deg, var(--purple-chart), var(--purple))}
+.card-actions{display:flex; gap:8px; margin-top:16px; flex-wrap:wrap}
+.btn{
+  appearance:none; font:inherit; font-size:13px; font-weight:500; cursor:pointer;
+  color:var(--ink); background:var(--raised); border:1px solid var(--line);
+  padding:7px 14px; border-radius:8px; letter-spacing:.04em; transition:border-color .15s, background .15s;
+}
+.btn:hover{border-color:var(--gold); color:var(--gold-bright)}
+.btn.primary{background:linear-gradient(120deg,#3a2f14,#4d3d18); border-color:rgba(230,179,76,.5); color:var(--gold-bright)}
+.btn.primary:hover{border-color:var(--gold-bright)}
+.btn.danger:hover{border-color:var(--lose); color:var(--lose)}
+.btn.big{font-size:15px; padding:11px 26px}
+.card .state-line{font-size:12.5px; color:var(--ink2); margin-top:10px}
+.card .state-line .win{color:var(--win)} .card .state-line .lose{color:var(--lose)}
+
+/* ---------- stats ---------- */
+.tiles{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:22px}
+.tile{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:16px 18px}
+.tile .t-label{font-size:12px; color:var(--ink3); letter-spacing:.08em}
+.tile .t-value{font-family:Cinzel,'Noto Sans TC',serif; font-weight:700; font-size:26px; margin-top:4px; color:var(--ink); font-variant-numeric:tabular-nums}
+.tile .t-value small{font-family:'Noto Sans TC',sans-serif; font-size:12px; font-weight:400; color:var(--ink3); margin-left:4px}
+.tile.accent .t-value{color:var(--gold-bright)}
+.chips{display:flex; gap:8px; margin:4px 0 18px; flex-wrap:wrap}
+.chip{appearance:none; font:inherit; font-size:13px; cursor:pointer; color:var(--ink2);
+  background:transparent; border:1px solid var(--line); padding:5px 14px; border-radius:999px}
+.chip[aria-pressed="true"]{color:var(--gold-bright); border-color:rgba(230,179,76,.5); background:rgba(230,179,76,.08)}
+.chart-card{margin-bottom:20px}
+.chart-card h3{font-size:15px}
+.chart-card .sub{margin-bottom:6px}
+.chart-box{position:relative}
+.chart-box svg{display:block; width:100%; height:auto}
+.tooltip{position:absolute; pointer-events:none; background:var(--raised); border:1px solid var(--line);
+  border-radius:8px; padding:6px 10px; font-size:12.5px; color:var(--ink); white-space:nowrap;
+  transform:translate(-50%,-110%); opacity:0; transition:opacity .12s; z-index:4; font-variant-numeric:tabular-nums}
+.tooltip b{color:var(--gold-bright)}
+.rec-table-wrap{overflow-x:auto}
+table.rec{width:100%; border-collapse:collapse; font-size:13.5px; font-variant-numeric:tabular-nums}
+table.rec th{font-size:12px; color:var(--ink3); font-weight:500; text-align:left; letter-spacing:.08em;
+  border-bottom:1px solid var(--line); padding:8px 10px}
+table.rec td{padding:8px 10px; border-bottom:1px solid rgba(42,49,84,.5)}
+table.rec tr:last-child td{border-bottom:none}
+.r5{color:var(--gold-bright); font-weight:700} .r4{color:var(--purple); font-weight:500}
+.pill{display:inline-block; font-size:11.5px; padding:1px 9px; border-radius:999px; border:1px solid var(--line)}
+.pill.win{color:var(--win); border-color:rgba(76,195,138,.4)}
+.pill.lose{color:var(--lose); border-color:rgba(224,99,122,.4)}
+.pill.gua{color:var(--gold-bright); border-color:rgba(230,179,76,.4)}
+.pity-tag{font-variant-numeric:tabular-nums}
+.pity-low{color:var(--win)} .pity-high{color:var(--lose)}
+.empty{padding:36px 20px; text-align:center; color:var(--ink3); font-size:14px; border:1px dashed var(--line); border-radius:var(--radius)}
+
+/* ---------- simulator ---------- */
+.sim-head{display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:18px}
+.sim-stage{position:relative; min-height:190px; background:var(--surface); border:1px solid var(--line);
+  border-radius:var(--radius); padding:22px; overflow:hidden; margin-bottom:16px}
+.meteor{position:absolute; inset:0; pointer-events:none; opacity:0}
+.meteor.play{animation:meteor .9s ease-out}
+@keyframes meteor{
+  0%{opacity:0; background:linear-gradient(115deg, transparent 30%, var(--mc,#ffd166) 50%, transparent 70%); background-position:-120% 0; background-size:250% 100%}
+  25%{opacity:.5} 60%{opacity:.35; background-position:60% 0} 100%{opacity:0; background-position:220% 0}
+}
+.pull-row{display:grid; grid-template-columns:repeat(auto-fill,minmax(86px,1fr)); gap:10px; position:relative}
+.pull-card{border-radius:10px; padding:12px 8px 10px; text-align:center; background:var(--raised);
+  border:1px solid var(--line); animation:pop .35s ease backwards}
+.pull-card .stars{font-size:11px; letter-spacing:.1em}
+.pull-card .p-name{font-size:12.5px; margin-top:4px; color:var(--ink2)}
+.pull-card.q5{border-color:rgba(230,179,76,.65); background:linear-gradient(160deg, rgba(230,179,76,.16), var(--raised)); }
+.pull-card.q5 .stars{color:var(--gold-bright)} .pull-card.q5 .p-name{color:var(--gold-bright); font-weight:700}
+.pull-card.q4{border-color:rgba(168,120,232,.5)}
+.pull-card.q4 .stars{color:var(--purple)} .pull-card.q4 .p-name{color:var(--purple)}
+.pull-card.q3 .stars{color:var(--blue)}
+@keyframes pop{from{opacity:0; transform:translateY(10px) scale(.92)} to{opacity:1; transform:none}}
+.sim-meta{display:flex; gap:22px; flex-wrap:wrap; font-size:13.5px; color:var(--ink2); margin-bottom:14px; font-variant-numeric:tabular-nums}
+.sim-meta b{color:var(--ink)}
+.sim-log{font-size:13px; color:var(--ink2); max-height:180px; overflow-y:auto}
+.sim-log div{padding:3px 0; border-bottom:1px solid rgba(42,49,84,.4)}
+details.model{margin-top:16px; font-size:13px; color:var(--ink2)}
+details.model summary{cursor:pointer; color:var(--ink3); letter-spacing:.05em}
+details.model ul{margin:8px 0 0; padding-left:20px}
+
+/* ---------- planner ---------- */
+.plan-form{display:flex; flex-wrap:wrap; gap:14px 18px; align-items:flex-end}
+.plan-form label{display:flex; flex-direction:column; gap:4px; font-size:12.5px; color:var(--ink2)}
+.plan-form input, .plan-form select, input.txt{
+  font:inherit; background:var(--night); color:var(--ink); border:1px solid var(--line);
+  border-radius:8px; padding:8px 12px; width:110px}
+input.txt{width:auto}
+.plan-form input:focus-visible, .plan-form select:focus-visible, input.txt:focus-visible{outline:2px solid var(--gold); outline-offset:1px}
+.chip .x{margin-left:6px; opacity:.6}
+.chip.fixed{opacity:.65; cursor:default; display:inline-block}
+
+/* ---------- data tab ---------- */
+.data-sec{margin-bottom:22px}
+.data-sec h3{font-family:'Noto Serif TC',serif; letter-spacing:.1em; font-size:16px; margin:0 0 10px}
+.data-sec p{color:var(--ink2); font-size:13.5px; margin:6px 0}
+.drop{border:1.5px dashed var(--line); border-radius:var(--radius); padding:30px; text-align:center; color:var(--ink3);
+  cursor:pointer; transition:border-color .2s, background .2s}
+.drop:hover,.drop.over{border-color:var(--gold); background:rgba(230,179,76,.05); color:var(--ink2)}
+textarea.io{width:100%; min-height:120px; background:var(--night); color:var(--ink); border:1px solid var(--line);
+  border-radius:8px; font:12.5px/1.5 Consolas,monospace; padding:10px; resize:vertical}
+
+/* ---------- dialog & toast ---------- */
+dialog{background:var(--raised); color:var(--ink); border:1px solid var(--line); border-radius:14px;
+  padding:26px 28px; max-width:400px; width:calc(100vw - 48px)}
+dialog::backdrop{background:rgba(5,7,16,.7); backdrop-filter:blur(2px)}
+dialog h3{margin:0 0 14px; font-family:'Noto Serif TC',serif; letter-spacing:.1em}
+dialog label{display:block; font-size:13px; color:var(--ink2); margin:12px 0 4px}
+dialog input[type=text]{width:100%; font:inherit; background:var(--night); color:var(--ink);
+  border:1px solid var(--line); border-radius:8px; padding:8px 12px}
+.dlg-actions{display:flex; gap:8px; margin-top:20px; flex-wrap:wrap; justify-content:flex-end}
+.result-opts{display:flex; gap:8px; margin-top:4px; flex-wrap:wrap}
+.result-opts .btn[aria-pressed="true"]{border-color:var(--gold-bright); color:var(--gold-bright); background:rgba(230,179,76,.1)}
+#toast{position:fixed; left:50%; bottom:34px; transform:translate(-50%,20px); z-index:50;
+  background:var(--raised); border:1px solid var(--gold); color:var(--ink); border-radius:10px;
+  padding:10px 22px; font-size:14px; opacity:0; pointer-events:none; transition:.25s}
+#toast.show{opacity:1; transform:translate(-50%,0)}
+.section-title{font-family:'Noto Serif TC',serif; font-weight:700; font-size:15px; letter-spacing:.14em;
+  color:var(--ink3); margin:26px 0 12px; display:flex; align-items:center; gap:12px}
+.section-title::after{content:""; flex:1; height:1px; background:var(--line)}
+footer{margin-top:60px; font-size:12px; color:var(--ink3); text-align:center; line-height:1.9}
+@media (prefers-reduced-motion: reduce){
+  *{animation-duration:.001s !important; transition-duration:.001s !important}
+}
+</style>
+</head>
+<body>
+
+<canvas id="sky" aria-hidden="true"></canvas>
+<div class="app">
+
+<header class="masthead">
+  <h1 class="wordmark">祈願觀測站</h1>
+  <span class="wordmark-en">Wish&nbsp;Observatory</span>
+  <span class="uid-tag" id="uidTag"></span>
+  <select id="profileSel" aria-label="切換帳號"></select>
+</header>
+
+<nav class="tabs" role="tablist" aria-label="主要頁籤">
+  <button role="tab" data-tab="track" aria-selected="true">祈願追蹤</button>
+  <button role="tab" data-tab="stats" aria-selected="false">統計分析</button>
+  <button role="tab" data-tab="plan" aria-selected="false">抽卡規劃</button>
+  <button role="tab" data-tab="sim" aria-selected="false">抽卡模擬</button>
+  <button role="tab" data-tab="data" aria-selected="false">資料</button>
+</nav>
+
+<!-- ══════════ 追蹤 ══════════ -->
+<section id="tab-track">
+  <div class="hero" id="hero"></div>
+  <div class="grid" id="bannerGrid"></div>
+  <p style="font-size:12.5px;color:var(--ink3);margin-top:14px">
+    小技巧:每抽完就按「+1 / +10」累積抽數;出金或出紫再按對應按鈕結算。也可以到「資料」頁一次匯入 UIGF 紀錄。按「復原」可撤銷上一步。<br>
+    鍵盤快捷鍵(角色池):<b>1</b> 加一抽 · <b>0</b> 加十抽 · <b>4</b> 出四星 · <b>5</b> 出五星 · <b>Z</b> 復原
+  </p>
+</section>
+
+<!-- ══════════ 統計 ══════════ -->
+<section id="tab-stats" hidden>
+  <div style="display:flex;align-items:flex-start;gap:10px">
+    <div class="chips" id="statsChips" role="group" aria-label="卡池篩選" style="flex:1"></div>
+    <button class="btn" id="shareBtn" style="flex:none">✦ 回顧卡</button>
+  </div>
+  <div class="tiles" id="statTiles"></div>
+
+  <div class="card" id="luckCard" hidden style="margin-bottom:20px">
+    <h3>歐氣體檢</h3>
+    <div class="sub" id="luckSub"></div>
+    <div class="luck-verdict">
+      <span class="luck-badge" id="luckBadge"></span>
+      <div class="luck-text" id="luckText"></div>
+    </div>
+  </div>
+
+  <div class="card chart-card">
+    <h3>里程碑</h3>
+    <div class="sub" id="msSub"></div>
+    <div id="msBox"></div>
+  </div>
+
+  <div class="card chart-card">
+    <h3>五星時間軸</h3>
+    <div class="sub" id="tlSub"></div>
+    <div class="chart-box" id="tlBox"></div>
+  </div>
+
+  <div class="card chart-card">
+    <h3>出金抽數分佈</h3>
+    <div class="sub" id="histSub"></div>
+    <div class="chart-box" id="histBox"></div>
+  </div>
+
+  <div class="card chart-card">
+    <h3>每月祈願次數</h3>
+    <div class="sub">最近 12 個月</div>
+    <div class="chart-box" id="monthBox"></div>
+  </div>
+
+  <div class="card chart-card">
+    <h3>四星常客排行</h3>
+    <div class="sub" id="r4Sub"></div>
+    <div id="r4Box"></div>
+  </div>
+
+  <div class="card chart-card">
+    <h3>出貨紀錄</h3>
+    <div class="sub" id="recSub"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:2px 0 12px">
+      <input type="text" id="recSearch" class="txt" placeholder="搜尋名稱…" style="flex:1;min-width:140px" aria-label="搜尋出貨紀錄">
+      <div class="chips" style="margin:0" id="recRank" role="group" aria-label="稀有度篩選"></div>
+    </div>
+    <div class="rec-table-wrap" id="recTable"></div>
+  </div>
+</section>
+
+<!-- ══════════ 規劃 ══════════ -->
+<section id="tab-plan" hidden>
+  <div class="chips" id="planChips" role="group" aria-label="規劃卡池"></div>
+  <div class="card" style="margin-bottom:16px">
+    <h3>目前狀態與預算</h3>
+    <div class="sub">數值可手動調整;「帶入追蹤資料」會讀取追蹤頁的保底進度</div>
+    <div class="plan-form">
+      <label>已墊抽數<input type="number" id="plPity" min="0" max="89" value="0"></label>
+      <label id="plGuarWrap">保底狀態<select id="plGuar"><option value="0">小保底</option><option value="1">大保底</option></select></label>
+      <label id="plRadWrap">明光連歪<select id="plRad"><option value="0">0</option><option value="1">1</option><option value="2">2</option></select></label>
+      <label id="plFateWrap" hidden>命定值<select id="plFate"><option value="0">0</option><option value="1">1</option></select></label>
+      <label>目標 UP 數<select id="plTarget"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option></select></label>
+      <label>手上可抽<input type="number" id="plBudget" min="0" value="0"></label>
+      <button class="btn" id="plSync">帶入追蹤資料</button>
+      <button class="btn primary" id="plCalc">計算機率</button>
+    </div>
+  </div>
+  <div class="card" style="margin-bottom:16px">
+    <h3>原石存抽計算</h3>
+    <div class="sub">日常委託約 60/日;有月卡再 +90;活動、深淵、版本更新另計,可自行調高</div>
+    <div class="plan-form">
+      <label>現有原石<input type="number" id="gmPrimo" min="0" value="0"></label>
+      <label>纖維之緣<input type="number" id="gmFate" min="0" value="0"></label>
+      <label>每日原石收入<input type="number" id="gmDaily" min="0" value="60"></label>
+      <label>存到哪天<input type="date" id="gmDate" style="width:150px"></label>
+      <button class="btn" id="gmCalc">計算可抽數</button>
+      <button class="btn primary" id="gmApply">帶入預算</button>
+    </div>
+    <p id="gmOut" style="font-size:14px;color:var(--ink2);margin:12px 0 0"></p>
+  </div>
+
+  <div class="tiles" id="planTiles"></div>
+  <div class="card chart-card" id="planChartCard" hidden>
+    <h3>出貨機率曲線</h3>
+    <div class="sub" id="planSub"></div>
+    <div class="chart-box" id="planBox"></div>
+  </div>
+  <p style="font-size:12.5px;color:var(--ink3)">機率模型與模擬器相同(角色 0.6% 基礎、74 抽軟保底、明光簡化模型;武器 0.7% / 63 / 80、命定值 1)。結果為 30,000 次蒙地卡羅模擬。</p>
+</section>
+
+<!-- ══════════ 模擬 ══════════ -->
+<section id="tab-sim" hidden>
+  <div class="sim-head">
+    <div class="chips" style="margin:0" id="simChips"></div>
+    <span style="flex:1"></span>
+    <button class="btn" id="simReset">重置模擬</button>
+  </div>
+  <div class="sim-stage">
+    <div class="meteor" id="meteor"></div>
+    <div class="pull-row" id="pullRow"><div class="empty" style="grid-column:1/-1;border:none">尚未開始 — 按下方按鈕祈願</div></div>
+  </div>
+  <div class="sim-meta" id="simMeta"></div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap">
+    <button class="btn big primary" id="pull1">祈願 ×1</button>
+    <button class="btn big primary" id="pull10">祈願 ×10</button>
+    <button class="btn big" id="pullTo5">一直抽到出金</button>
+  </div>
+  <div class="section-title">五星紀錄</div>
+  <div class="sim-log" id="simLog"><div style="border:none;color:var(--ink3)">尚無紀錄</div></div>
+  <details class="model">
+    <summary>機率模型說明</summary>
+    <ul>
+      <li>角色池:基礎 0.6%,第 74 抽起每抽 +6%(軟保底),第 90 抽必出;小保底 50/50,歪後大保底必中。</li>
+      <li>捕獲明光(簡化模型):連續歪 2 次後,下一次小保底必定不歪。</li>
+      <li>武器池:基礎 0.7%,第 63 抽起每抽 +7%,第 80 抽必出;75% 出 UP(兩把均分),命定值滿 1 必出定軌目標。</li>
+      <li>四星:基礎 5.1%,第 9 抽 56.1%,第 10 抽必出;UP 四星 50/50。</li>
+    </ul>
+  </details>
+</section>
+
+<!-- ══════════ 資料 ══════════ -->
+<section id="tab-data" hidden>
+  <div class="card data-sec">
+    <h3>匯入 UIGF 紀錄</h3>
+    <p>支援 UIGF v2.2 / v3.0 / v4.0 JSON。用資料夾裡的「一鍵抓祈願紀錄」腳本或 Snap Hutao 等工具產生後拖曳到下方。匯入採<b>依 id 合併</b>:重複的自動略過、新的加進來 — 之後定期重抓匯入,即使官方刪除過期紀錄,這裡仍會保留完整歷史。</p>
+    <div class="drop" id="drop">拖曳 JSON 檔到這裡,或點擊選擇檔案</div>
+    <input type="file" id="fileInput" accept=".json,application/json" hidden>
+  </div>
+
+  <div class="card data-sec">
+    <h3>備份與還原</h3>
+    <p>所有資料只儲存在這個瀏覽器的 localStorage,不會上傳到任何伺服器。換裝置前請先備份。</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <button class="btn" id="exportBtn">產生備份 JSON</button>
+      <button class="btn" id="uigfBtn">匯出 UIGF v4</button>
+      <button class="btn" id="copyBtn" hidden>複製到剪貼簿</button>
+      <button class="btn" id="restoreBtn">從貼上內容還原</button>
+      <button class="btn danger" id="wipeBtn">清除全部資料</button>
+    </div>
+    <textarea class="io" id="ioArea" placeholder="備份 JSON 會顯示在這裡;還原時把備份內容貼進來再按「從貼上內容還原」。" aria-label="備份與還原內容"></textarea>
+  </div>
+
+  <div class="card data-sec">
+    <h3>帳號管理</h3>
+    <p>每個帳號的紀錄各自獨立保存(含備份、常駐名單設定),右上角可隨時切換。</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <input type="text" id="profName" class="txt" style="flex:1;min-width:150px" aria-label="帳號名稱">
+      <button class="btn" id="profRename">改名</button>
+      <button class="btn" id="profAdd">新增帳號</button>
+      <button class="btn danger" id="profDel">刪除此帳號</button>
+    </div>
+  </div>
+
+  <div class="card data-sec">
+    <h3>常駐五星角色名單(判斷歪/沒歪)</h3>
+    <p>角色池出金若在名單內會被判為「歪」。官方把新角色加入常駐池時,把名字加進來(要跟紀錄裡的寫法一致),所有匯入紀錄會自動重新判定。</p>
+    <div class="chips" id="stdChips" style="margin:0 0 10px"></div>
+    <div style="display:flex;gap:8px">
+      <input type="text" id="stdInput" class="txt" placeholder="輸入角色名(繁/簡/英)" style="flex:1" aria-label="新增常駐角色名">
+      <button class="btn" id="stdAdd">新增</button>
+    </div>
+  </div>
+
+  <div class="card data-sec">
+    <h3>關於</h3>
+    <p>個人用的原神祈願追蹤工具,靈感致敬 paimon.moe,但加上了它沒有的抽卡模擬器與捕獲明光追蹤。純前端、無伺服器、無版權素材。</p>
+    <p>本工具與 miHoYo / HoYoverse 無任何關聯;遊戲名詞版權屬原公司所有。</p>
+  </div>
+</section>
+
+<footer>祈願觀測站 · 資料僅存於本機瀏覽器 · 致敬 paimon.moe 的原創實作</footer>
+</div>
+
+<!-- 回顧卡 -->
+<div id="shareOverlay" class="share-overlay" hidden>
+  <div class="share-card" id="shareCard"></div>
+  <div class="share-actions">
+    <span>截圖保存這張卡 ✦</span>
+    <button class="btn" id="shareClose">關閉</button>
+  </div>
+</div>
+
+<!-- 出金對話框 -->
+<dialog id="dlg5">
+  <h3>記錄五星</h3>
+  <label for="dlgName">名稱(可留空)</label>
+  <input type="text" id="dlgName" placeholder="例:芙寧娜">
+  <div id="dlgResultWrap">
+    <label>結果</label>
+    <div class="result-opts" id="dlgResults"></div>
+  </div>
+  <div class="dlg-actions">
+    <button class="btn" id="dlgCancel">取消</button>
+    <button class="btn primary" id="dlgSave">儲存</button>
+  </div>
+</dialog>
+
+<div id="toast" role="status"></div>
+
+<script>
+'use strict';
+/* ═══════════════════ 基礎資料 ═══════════════════ */
+const LS_KEY = 'wish-observatory-v1';
+const BANNERS = [
+  {key:'character', label:'角色活動祈願', en:'Character Event', types:['301','400'], max5:90, soft5:74, has5050:true},
+  {key:'weapon',    label:'武器活動祈願', en:'Weapon Event',    types:['302'], max5:80, soft5:63, has5050:true},
+  {key:'standard',  label:'常駐祈願',     en:'Standard',        types:['200'], max5:90, soft5:74, has5050:false},
+  {key:'chronicled',label:'集錄祈願',     en:'Chronicled',      types:['500'], max5:90, soft5:74, has5050:false},
+  {key:'novice',    label:'新手祈願',     en:'Novice',          types:['100'], max5:90, soft5:74, has5050:false, hiddenIfEmpty:true},
+];
+const bannerOf = k => BANNERS.find(b=>b.key===k);
+// 常駐池五星(簡中/繁中/英文)— 用來判斷角色池是否歪
+const STD_CHARS = new Set(['七七','琴','迪卢克','迪盧克','莫娜','刻晴','提纳里','提納里','迪希雅',
+  'Qiqi','Jean','Diluc','Mona','Keqing','Tighnari','Dehya']);
+const STD_WEAPONS = new Set(['阿莫斯之弓','天空之翼','天空之卷','天空之脊','天空之傲','天空之刃',
+  '四风原典','四風原典','和璞鸢','和璞鳶','狼的末路','风鹰剑','風鷹劍',
+  "Amos' Bow",'Skyward Harp','Skyward Atlas','Skyward Spine','Skyward Pride','Skyward Blade',
+  'Lost Prayer to the Sacred Winds','Primordial Jade Winged-Spear',"Wolf's Gravestone",'Aquila Favonia']);
+const STD_DISPLAY = ['琴','迪盧克','七七','莫娜','刻晴','提納里','迪希雅'];
+function isStdChar(n){ return STD_CHARS.has(n) || (state.stdChars||[]).includes(n); }
+
+/* ═══════════════════ 狀態 ═══════════════════ */
+function blankBanner(){ return {pity5:0, pity4:0, guaranteed:false, radiance:0, total:0, records:[]}; }
+function blankState(){
+  const banners = {};
+  BANNERS.forEach(b=>banners[b.key]=blankBanner());
+  return {uid:'', banners, monthly:{}, raw:{}, stdChars:[], tz:8, lang:'zh-tw', updated:0};
+}
+/* 多帳號:meta 記錄有哪些帳號與目前使用中的那個,各帳號資料存在各自的 key */
+const META_KEY = 'wish-observatory-meta';
+function loadMeta(){
+  try{
+    const m = JSON.parse(localStorage.getItem(META_KEY)||'null');
+    if(m && Array.isArray(m.profiles) && m.profiles.length && m.active) return m;
+  }catch(e){}
+  return {active: LS_KEY, profiles:[{key: LS_KEY, name:'帳號 1'}]};
+}
+function saveMeta(){ try{ localStorage.setItem(META_KEY, JSON.stringify(meta)); }catch(e){} }
+let meta = loadMeta();
+let state = load();
+const undoStack = [];
+
+function load(){
+  try{
+    const raw = localStorage.getItem(meta.active);
+    if(!raw) return blankState();
+    const s = JSON.parse(raw);
+    const base = blankState();
+    // 補齊缺欄位,容錯舊版
+    s.banners = Object.assign(base.banners, s.banners||{});
+    BANNERS.forEach(b=>{ s.banners[b.key] = Object.assign(blankBanner(), s.banners[b.key]||{}); });
+    s.monthly = s.monthly||{};
+    s.raw = s.raw||{};
+    s.stdChars = s.stdChars||[];
+    s.uid = s.uid||'';
+    return s;
+  }catch(e){ return blankState(); }
+}
+function save(){
+  state.updated = Date.now();
+  try{ localStorage.setItem(meta.active, JSON.stringify(state)); }catch(e){ toast('儲存失敗:瀏覽器空間不足'); }
+}
+function snapshot(){ undoStack.push(JSON.stringify(state)); if(undoStack.length>30) undoStack.shift(); }
+function undo(){
+  if(!undoStack.length){ toast('沒有可復原的操作'); return; }
+  state = JSON.parse(undoStack.pop());
+  save(); renderAll(); toast('已復原上一步');
+}
+function monthKey(d){
+  if(typeof d==='string' && /^\d{4}-\d{2}/.test(d)) return d.slice(0,7);
+  const dt = d? new Date(d) : new Date();
+  return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0');
+}
+function bumpMonthly(key, n, when){
+  const mk = monthKey(when);
+  if(!state.monthly[mk]) state.monthly[mk] = {};
+  state.monthly[mk][key] = (state.monthly[mk][key]||0)+n;
+}
+
+/* ═══════════════════ 手動記錄 ═══════════════════ */
+function addPulls(key, n){
+  snapshot();
+  const b = state.banners[key];
+  b.pity5 += n; b.pity4 += n; b.total += n;
+  bumpMonthly(key, n);
+  save(); renderAll();
+}
+function log4(key){
+  snapshot();
+  const b = state.banners[key];
+  const pity = b.pity4 + 1;
+  b.pity4 = 0; b.pity5 += 1; b.total += 1;
+  b.records.push({id:Date.now()+''+Math.random().toString(36).slice(2,6), name:'', rarity:4, pity, result:null, time:nowStr(), src:'manual'});
+  bumpMonthly(key, 1);
+  save(); renderAll(); toast('已記錄四星(第 '+pity+' 抽)');
+}
+let dlgCtx = null;
+function open5Dialog(key){
+  dlgCtx = {key, result:null};
+  const banner = bannerOf(key);
+  const b = state.banners[key];
+  document.getElementById('dlgName').value = '';
+  const wrap = document.getElementById('dlgResultWrap');
+  const opts = document.getElementById('dlgResults');
+  opts.innerHTML = '';
+  if(banner.has5050){
+    wrap.hidden = false;
+    let choices;
+    if(b.guaranteed){ choices=[['guaranteed','大保底必中']]; dlgCtx.result='guaranteed'; }
+    else if(key==='character' && b.radiance>=2){ choices=[['radiance','明光必中']]; dlgCtx.result='radiance'; }
+    else choices=[['win','沒歪 ✓'],['lose','歪了 ✗']];
+    choices.forEach(([val,label])=>{
+      const btn = document.createElement('button');
+      btn.className='btn'; btn.type='button'; btn.textContent=label;
+      btn.setAttribute('aria-pressed', String(dlgCtx.result===val));
+      btn.onclick=()=>{ dlgCtx.result=val;
+        opts.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed','false'));
+        btn.setAttribute('aria-pressed','true'); };
+      opts.appendChild(btn);
+    });
+  }else{ wrap.hidden = true; dlgCtx.result = null; }
+  document.getElementById('dlg5').showModal();
+}
+function save5(){
+  const key = dlgCtx.key, banner = bannerOf(key), b = state.banners[key];
+  if(banner.has5050 && !dlgCtx.result){ toast('請先選擇結果'); return; }
+  snapshot();
+  const pity = b.pity5 + 1;
+  const name = document.getElementById('dlgName').value.trim();
+  const result = dlgCtx.result;
+  b.pity5 = 0; b.pity4 += 1; b.total += 1;
+  if(banner.has5050){
+    if(result==='lose'){ b.guaranteed = true; if(key==='character') b.radiance += 1; }
+    else { b.guaranteed = false; if(key==='character') b.radiance = 0; }
+  }
+  b.records.push({id:Date.now()+''+Math.random().toString(36).slice(2,6), name, rarity:5, pity,
+    result:(result==='radiance'?'win':result), via:result, time:nowStr(), src:'manual'});
+  bumpMonthly(key, 1);
+  document.getElementById('dlg5').close();
+  save(); renderAll();
+  toast('已記錄五星:第 '+pity+' 抽' + (name?' · '+name:''));
+}
+function nowStr(){
+  const d=new Date(), p=n=>String(n).padStart(2,'0');
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());
+}
+
+/* ═══════════════════ UIGF 匯入(依 id 合併累積) ═══════════════════ */
+function idCmp(a,b){ const x=a.id, y=b.id; return x.length!==y.length ? x.length-y.length : (x<y?-1:x>y?1:0); }
+function importUIGF(json){
+  let profiles = [];
+  if(json && json.hk4e && Array.isArray(json.hk4e)){          // v4
+    profiles = json.hk4e.map(p=>({uid:String(p.uid||''), list:p.list||[], tz:p.timezone, lang:p.lang}));
+  }else if(json && Array.isArray(json.list)){                  // v2/v3
+    profiles = [{uid:String((json.info&&json.info.uid)||''), list:json.list,
+      tz:(json.info&&json.info.region_time_zone), lang:(json.info&&json.info.lang)}];
+  }else{
+    toast('無法辨識的格式:不是 UIGF JSON'); return;
+  }
+  profiles = profiles.filter(p=>p.list && p.list.length);
+  if(!profiles.length){ toast('檔案裡沒有祈願紀錄'); return; }
+  const prof = profiles.reduce((a,b)=> (b.list.length>a.list.length? b:a));  // 取紀錄最多的帳號
+  if(state.uid && prof.uid && state.uid!==prof.uid &&
+     !confirm('這份檔案的 UID('+prof.uid+')與目前資料(UID '+state.uid+')不同,仍要合併匯入嗎?')) return;
+
+  // 先比對出真正的新紀錄
+  state.raw = state.raw||{};
+  const adds = {}; let added=0, dup=0;
+  prof.list.forEach(it=>{
+    const ug = String(it.uigf_gacha_type||''), gt = String(it.gacha_type||ug);
+    const banner = BANNERS.find(b=>b.types.includes(gt)) || BANNERS.find(b=>b.types.includes(ug));
+    if(!banner) return;
+    const id = String(it.id || (String(it.time||'')+'/'+(it.name||'')));
+    if((state.raw[banner.key]||[]).some(x=>x.id===id) ||
+       (adds[banner.key]||[]).some(x=>x.id===id)){ dup++; return; }
+    (adds[banner.key] = adds[banner.key]||[]).push(
+      {id, gt, ty:it.item_type||'', name:it.name||'', rank:Number(it.rank_type)||3, time:String(it.time||'')});
+    added++;
+  });
+  if(!added){ toast('沒有新紀錄'+(dup?'('+dup+' 筆已存在)':'')); return; }
+
+  snapshot();
+  state.uid = prof.uid || state.uid;
+  if(prof.tz!=null) state.tz = prof.tz;
+  if(prof.lang) state.lang = prof.lang;
+  Object.keys(adds).forEach(key=>{
+    state.raw[key] = (state.raw[key]||[]).concat(adds[key]);
+    rebuildBanner(key);
+  });
+  save(); renderAll();
+  toast('匯入成功:新增 '+added+' 筆'+(dup?'、略過重複 '+dup+' 筆':'')+(state.uid?' · UID '+state.uid:''));
+}
+// 由原始紀錄重算一個卡池(該卡池的手動紀錄會被官方紀錄取代)
+function rebuildBanner(key){
+  const banner = bannerOf(key);
+  const items = (state.raw[key]||[]).slice().sort(idCmp);
+  const b = state.banners[key] = blankBanner();
+  Object.keys(state.monthly).forEach(mk=>{ delete state.monthly[mk][key]; });
+  let prevResult = null;
+  items.forEach(it=>{
+    b.pity5 += 1; b.pity4 += 1; b.total += 1;
+    bumpMonthly(key, 1, it.time);
+    if(it.rank===4){
+      b.records.push({id:it.id, name:it.name, ty:it.ty, rarity:4, pity:b.pity4, result:null, time:it.time.slice(0,16), src:'import'});
+      b.pity4 = 0;
+    }else if(it.rank===5){
+      let result = null, via = null;
+      if(banner.has5050){
+        const isStd = key==='character' ? isStdChar(it.name) : STD_WEAPONS.has(it.name);
+        if(prevResult==='lose'){ result='guaranteed'; via='guaranteed'; }
+        else if(isStd){ result='lose'; via='lose'; }
+        else { result='win'; via='win'; }
+        prevResult = result;
+        if(result==='lose'){ b.guaranteed=true; if(key==='character') b.radiance+=1; }
+        else { b.guaranteed=false; if(key==='character') b.radiance=0; }
+      }
+      b.records.push({id:it.id, name:it.name, ty:it.ty, rarity:5, pity:b.pity5, result, via, time:it.time.slice(0,16), src:'import'});
+      b.pity5 = 0;
+    }
+  });
+}
+function rebuildAllFromRaw(){
+  Object.keys(state.raw||{}).forEach(k=>{ if((state.raw[k]||[]).length) rebuildBanner(k); });
+}
+
+/* ═══════════════════ 渲染:追蹤 ═══════════════════ */
+function esc(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function renderHero(){
+  const b = state.banners.character, banner = bannerOf('character');
+  const pct = Math.min(1, b.pity5/banner.max5);
+  const C = 2*Math.PI*62;
+  const hot = b.pity5 >= banner.soft5-1;
+  const toSoft = Math.max(0, banner.soft5 - b.pity5);
+  const toHard = banner.max5 - b.pity5;
+  const dots = [0,1].map(i=>'<i class="'+(b.radiance>i?'on':'')+'"></i>').join('');
+  let stateBadge = b.guaranteed
+    ? '<span class="badge gold">大保底 · 下金必中</span>'
+    : (b.radiance>=2 ? '<span class="badge gold">明光蓄能 · 下次必不歪</span>'
+                     : '<span class="badge dim">小保底 · 50 / 50</span>');
+  document.getElementById('hero').innerHTML =
+    '<div class="ring-wrap">'+
+      '<svg width="150" height="150" viewBox="0 0 150 150" aria-hidden="true">'+
+        '<circle class="ring-bg" cx="75" cy="75" r="62" fill="none" stroke-width="7"/>'+
+        '<circle class="ring-fg'+(hot?' hot':'')+'" cx="75" cy="75" r="62" fill="none" stroke-width="7" stroke-linecap="round" '+
+          'stroke-dasharray="'+C.toFixed(1)+'" stroke-dashoffset="'+(C*(1-pct)).toFixed(1)+'"/>'+
+      '</svg>'+
+      '<div class="ring-num"><b>'+b.pity5+'</b><span>PITY</span></div>'+
+    '</div>'+
+    '<div class="hero-info">'+
+      '<h2>角色活動祈願 · 保底進度</h2>'+
+      '<p class="hero-line">'+(toSoft>0 ? '距離軟保底還有 <b>'+toSoft+'</b> 抽' : '已進入軟保底區,機率每抽遞增')+'</p>'+
+      '<p class="hero-line">最遲 <b>'+toHard+'</b> 抽內必出五星</p>'+
+      '<div class="badges">'+stateBadge+
+        '<span class="badge dim">明光<span class="radiance-dots" title="連歪計數(簡化模型:滿 2 後下次必不歪)">'+dots+'</span></span>'+
+        '<span class="badge dim">累計 '+b.total.toLocaleString()+' 抽</span>'+
+      '</div>'+
+    '</div>';
+}
+function renderCards(){
+  const grid = document.getElementById('bannerGrid');
+  grid.innerHTML = '';
+  BANNERS.forEach(banner=>{
+    const b = state.banners[banner.key];
+    if(banner.hiddenIfEmpty && b.total===0) return;
+    const last5 = b.records.filter(r=>r.rarity===5).slice(-1)[0];
+    let stateLine = '';
+    if(banner.has5050){
+      stateLine = b.guaranteed ? '目前狀態:<b class="lose">大保底</b>(下一金必中 UP)'
+                               : '目前狀態:<b class="win">小保底</b>';
+      if(banner.key==='character' && b.radiance>0 && !b.guaranteed)
+        stateLine += ' · 明光 '+b.radiance+'/2';
+    }
+    if(last5) stateLine += (stateLine?'<br>':'') + '上一金:'+esc(last5.name||'五星')+'(第 '+last5.pity+' 抽)';
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML =
+      '<h3>'+banner.label+'</h3><div class="sub">'+banner.en+' · 累計 '+b.total.toLocaleString()+' 抽</div>'+
+      '<div class="meter"><div class="m-label"><span>五星保底</span><b>'+b.pity5+' / '+banner.max5+'</b></div>'+
+        '<div class="m-track"><div class="m-fill g5" style="width:'+Math.min(100,b.pity5/banner.max5*100)+'%"></div></div></div>'+
+      '<div class="meter"><div class="m-label"><span>四星保底</span><b>'+b.pity4+' / 10</b></div>'+
+        '<div class="m-track"><div class="m-fill g4" style="width:'+Math.min(100,b.pity4/10*100)+'%"></div></div></div>'+
+      (stateLine?'<p class="state-line">'+stateLine+'</p>':'')+
+      '<div class="card-actions">'+
+        '<button class="btn" data-act="p1">+1</button>'+
+        '<button class="btn" data-act="p10">+10</button>'+
+        '<button class="btn" data-act="l4">出 4★</button>'+
+        '<button class="btn primary" data-act="l5">出 5★!</button>'+
+        '<button class="btn" data-act="undo" aria-label="復原上一步">復原</button>'+
+      '</div>';
+    card.querySelector('[data-act=p1]').onclick = ()=>addPulls(banner.key,1);
+    card.querySelector('[data-act=p10]').onclick = ()=>addPulls(banner.key,10);
+    card.querySelector('[data-act=l4]').onclick = ()=>log4(banner.key);
+    card.querySelector('[data-act=l5]').onclick = ()=>open5Dialog(banner.key);
+    card.querySelector('[data-act=undo]').onclick = undo;
+    grid.appendChild(card);
+  });
+}
+
+/* ═══════════════════ 渲染:統計 ═══════════════════ */
+let statsFilter = 'character';
+function renderStatsChips(){
+  const wrap = document.getElementById('statsChips');
+  wrap.innerHTML = '';
+  BANNERS.filter(b=>!(b.hiddenIfEmpty && state.banners[b.key].total===0)).forEach(b=>{
+    const c = document.createElement('button');
+    c.className='chip'; c.textContent=b.label;
+    c.setAttribute('aria-pressed', String(statsFilter===b.key));
+    c.onclick=()=>{ statsFilter=b.key; renderStats(); };
+    wrap.appendChild(c);
+  });
+}
+function pityClass(p, max){ return p<=max*0.45 ? 'pity-low' : (p>=max*0.82 ? 'pity-high' : ''); }
+function renderStats(){
+  renderStatsChips();
+  const banner = bannerOf(statsFilter), b = state.banners[statsFilter];
+  const r5 = b.records.filter(r=>r.rarity===5);
+  const wins = r5.filter(r=>r.result==='win').length;
+  const loses = r5.filter(r=>r.result==='lose').length;
+  const avg = r5.length ? (r5.reduce((s,r)=>s+r.pity,0)/r5.length) : 0;
+  const best = r5.length ? Math.min(...r5.map(r=>r.pity)) : 0;
+  const worst = r5.length ? Math.max(...r5.map(r=>r.pity)) : 0;
+  const tiles = [
+    ['累計祈願', b.total.toLocaleString(), '抽', false],
+    ['換算原石', (b.total*160).toLocaleString(), '', false],
+    ['五星數', r5.length, '', true],
+    ['平均出金', r5.length? avg.toFixed(1):'—', r5.length?'抽':'', true],
+  ];
+  if(banner.has5050) tiles.push(['小保底勝率', (wins+loses)? Math.round(wins/(wins+loses)*100)+'%':'—',
+    (wins+loses)? wins+'勝'+loses+'歪':'', false]);
+  if(r5.length) tiles.push(['最歐 / 最非', best+' / '+worst, '抽', false]);
+  const r4 = b.records.filter(r=>r.rarity===4);
+  if(r4.length) tiles.push(['平均四星', (r4.reduce((s,r)=>s+r.pity,0)/r4.length).toFixed(1), '抽', false]);
+  document.getElementById('statTiles').innerHTML = tiles.map(t=>
+    '<div class="tile'+(t[3]?' accent':'')+'"><div class="t-label">'+t[0]+'</div>'+
+    '<div class="t-value">'+t[1]+(t[2]?'<small>'+t[2]+'</small>':'')+'</div></div>').join('');
+  renderLuck(banner, r5);
+  renderMilestones(banner, b, r5);
+  renderTimeline(banner, r5);
+  renderHistogram(banner, r5);
+  renderMonthly();
+  render4Rank(banner, r4);
+  renderRecords(banner, b);
+}
+/* ── 歐氣體檢 ── */
+function qModel(n, banner){
+  if(banner.key==='weapon'){ if(n>=80) return 1; return n<63? 0.007 : Math.min(1, 0.007+0.07*(n-62)); }
+  if(n>=90) return 1; return n<74? 0.006 : Math.min(1, 0.006+0.06*(n-73));
+}
+function renderLuck(banner, r5){
+  const card = document.getElementById('luckCard');
+  if(!r5.length || banner.key==='novice'){ card.hidden = true; return; }
+  card.hidden = false;
+  const badge = document.getElementById('luckBadge');
+  const text = document.getElementById('luckText');
+  if(r5.length < 4){
+    document.getElementById('luckSub').textContent = banner.label+' · 樣本不足';
+    badge.textContent = '？';
+    text.innerHTML = '目前只有 '+r5.length+' 金,樣本還太少。出金滿 4 次後就會開始體檢。';
+    return;
+  }
+  const L = computeLuck(banner, r5);
+  const wins = r5.filter(r=>r.result==='win').length, loses = r5.filter(r=>r.result==='lose').length;
+  let extra = '';
+  if(banner.has5050 && wins+loses>0)
+    extra = '小保底 '+wins+' 勝 '+loses+' 歪('+Math.round(wins/(wins+loses)*100)+'%;含明光的長期期望約 55%)。';
+  document.getElementById('luckSub').textContent = banner.label+' · '+r5.length+' 金樣本 · 蒙地卡羅 20,000 次';
+  badge.textContent = L.tier;
+  text.innerHTML = '平均 <b>'+L.avg.toFixed(1)+'</b> 抽出金(理論期望 '+L.mean.toFixed(1)+' 抽),'+
+    '運氣贏過約 <b>'+L.beat+'%</b> 同樣抽了 '+r5.length+' 金的理論旅行者。'+extra;
+}
+function computeLuck(banner, r5){
+  if(!r5.length || r5.length<4 || banner.key==='novice') return null;
+  const avg = r5.reduce((s,r)=>s+r.pity,0)/r5.length;
+  const pmf = []; let surv = 1, mean = 0;
+  for(let n=1;n<=banner.max5;n++){ const q=qModel(n,banner); pmf[n]=surv*q; mean+=n*pmf[n]; surv*=1-q; }
+  const cdf = []; let c = 0;
+  for(let n=1;n<=banner.max5;n++){ c+=pmf[n]; cdf[n]=c; }
+  const draw = ()=>{ const u=Math.random()*c; let lo=1, hi=banner.max5;
+    while(lo<hi){ const mid=(lo+hi)>>1; if(cdf[mid]<u) lo=mid+1; else hi=mid; } return lo; };
+  const S = 20000; let lower = 0;
+  for(let i=0;i<S;i++){ let s=0; for(let k=0;k<r5.length;k++) s+=draw(); if(s/r5.length<=avg) lower++; }
+  const p = lower/S;
+  const beat = Math.round((1-p)*100);
+  let tier;
+  if(p<=0.10) tier='歐皇'; else if(p<=0.30) tier='偏歐'; else if(p<0.70) tier='標準幸運'; else if(p<0.90) tier='偏非'; else tier='非酋';
+  return {avg, mean, p, beat, tier};
+}
+/* ── 五星時間軸 ── */
+function parseT(s){
+  const m = /^(\d{4})-(\d{2})-(\d{2})[ T]?(\d{2})?:?(\d{2})?/.exec(String(s||''));
+  if(!m) return null;
+  return new Date(+m[1], +m[2]-1, +m[3], +(m[4]||0), +(m[5]||0)).getTime();
+}
+function renderTimeline(banner, r5){
+  const box = document.getElementById('tlBox');
+  document.getElementById('tlSub').textContent = banner.label+' · 高度 = 出金抽數 · 金色沒歪、粉色歪、灰色無大小保底';
+  const evts = r5.map(r=>({r, t:parseT(r.time)})).filter(e=>e.t).sort((a,b)=>a.t-b.t);
+  if(!evts.length){ box.innerHTML = '<div class="empty">尚無五星紀錄(手動紀錄需有時間才會顯示)</div>'; return; }
+  const W=720, H=250, padL=40, padR=20, padT=40, padB=30;
+  let t0 = evts[0].t, t1 = evts[evts.length-1].t;
+  const span = Math.max(t1-t0, 86400000*30);
+  t0 -= span*0.05; t1 += span*0.05;
+  const X = t=>padL+(W-padL-padR)*((t-t0)/(t1-t0));
+  const Y = p=>H-padB-(H-padT-padB)*(Math.min(p,banner.max5)/banner.max5);
+  let g = '';
+  [30,60,banner.max5].forEach(p=>{
+    g += '<line x1="'+padL+'" y1="'+Y(p).toFixed(1)+'" x2="'+(W-padR)+'" y2="'+Y(p).toFixed(1)+'" stroke="var(--line)" stroke-width="1" opacity=".45"/>'+
+         '<text x="'+(padL-7)+'" y="'+(Y(p)+4).toFixed(1)+'" text-anchor="end" font-size="10.5" fill="var(--ink3)">'+p+'</text>';
+  });
+  const months = [];
+  const d0 = new Date(t0);
+  let mc = new Date(d0.getFullYear(), d0.getMonth(), 1);
+  while(mc.getTime() <= t1){ months.push(new Date(mc)); mc.setMonth(mc.getMonth()+1); }
+  const mstep = Math.max(1, Math.ceil(months.length/8));
+  let shown = 0;
+  months.forEach((mo,i)=>{
+    if(i%mstep) return;
+    const x = X(mo.getTime());
+    if(x<padL || x>W-padR) return;
+    const lab = (shown===0 || mo.getMonth()===0) ? String(mo.getFullYear()).slice(2)+"'"+(mo.getMonth()+1)+'月' : (mo.getMonth()+1)+'月';
+    g += '<text x="'+x.toFixed(1)+'" y="'+(H-8)+'" text-anchor="middle" font-size="10.5" fill="var(--ink3)">'+lab+'</text>';
+    shown++;
+  });
+  const showNames = evts.length <= 26;
+  let marks = '';
+  evts.forEach((e,i)=>{
+    const x = X(e.t), y = Y(e.r.pity);
+    const via = e.r.via || e.r.result;
+    const col = via==='lose' ? 'var(--lose)' : (via ? 'var(--gold-bright)' : 'var(--ink2)');
+    marks += '<line x1="'+x.toFixed(1)+'" y1="'+(H-padB)+'" x2="'+x.toFixed(1)+'" y2="'+y.toFixed(1)+'" stroke="'+col+'" stroke-width="1.5" opacity=".4"/>'+
+      '<circle data-i="'+i+'" cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="5.5" fill="'+col+'" stroke="var(--surface)" stroke-width="2"/>';
+    if(showNames)
+      marks += '<text x="'+(x+3).toFixed(1)+'" y="'+(y-10).toFixed(1)+'" transform="rotate(-38 '+x.toFixed(1)+' '+(y-10).toFixed(1)+')" font-size="10.5" fill="var(--ink2)">'+esc(e.r.name||'五星')+'</text>';
+  });
+  box.innerHTML = '<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="五星出金時間軸">'+g+marks+
+    '<line x1="'+padL+'" y1="'+(H-padB)+'" x2="'+(W-padR)+'" y2="'+(H-padB)+'" stroke="var(--line)"/></svg>';
+  const tip = attachTip(box);
+  box.querySelectorAll('circle[data-i]').forEach(cir=>{
+    cir.addEventListener('mousemove', ev=>{
+      const e = evts[+cir.dataset.i];
+      const via = e.r.via || e.r.result;
+      tip.innerHTML = '<b>'+esc(e.r.name||'五星')+'</b> · 第 '+e.r.pity+' 抽'+(via? ' · '+VIA_LABEL[via] : '')+'<br>'+esc(e.r.time||'');
+      const bb = box.getBoundingClientRect();
+      tip.style.left = (ev.clientX-bb.left)+'px'; tip.style.top = (ev.clientY-bb.top-6)+'px'; tip.style.opacity = 1;
+    });
+    cir.addEventListener('mouseleave', ()=>tip.style.opacity=0);
+  });
+}
+/* ── 四星常客排行 ── */
+function render4Rank(banner, r4){
+  document.getElementById('r4Sub').textContent = banner.label+' · 出現次數前 8 名';
+  const box = document.getElementById('r4Box');
+  const named = r4.filter(r=>r.name);
+  if(!named.length){ box.innerHTML = '<div class="empty">尚無帶名字的四星紀錄(匯入官方紀錄才有名字)</div>'; return; }
+  const byName = {};
+  named.forEach(r=>{ byName[r.name] = (byName[r.name]||0)+1; });
+  const top = Object.entries(byName).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const mx = top[0][1];
+  box.innerHTML = top.map(([n,cnt])=>
+    '<div class="r4row"><span class="r4name">'+esc(n)+'</span>'+
+    '<div class="r4track"><div class="r4bar" style="width:'+(cnt/mx*100).toFixed(1)+'%"></div></div>'+
+    '<span class="r4cnt">'+cnt+'</span></div>').join('');
+}
+function svgEl(html){ const d=document.createElement('div'); d.innerHTML=html; return d.firstElementChild; }
+function attachTip(box){
+  let tip = box.querySelector('.tooltip');
+  if(!tip){ tip=document.createElement('div'); tip.className='tooltip'; box.appendChild(tip); }
+  return tip;
+}
+function renderHistogram(banner, r5){
+  const box = document.getElementById('histBox');
+  document.getElementById('histSub').textContent =
+    banner.label+' · 每 5 抽一組 · 軟保底自第 '+banner.soft5+' 抽起 · 虛線 = 理論分佈';
+  if(!r5.length){ box.innerHTML='<div class="empty">還沒有五星紀錄 — 匯入 UIGF 或手動記錄後就會出現分佈圖</div>'; return; }
+  const binW = 5, nBins = Math.ceil(banner.max5/binW);
+  const bins = new Array(nBins).fill(0);
+  r5.forEach(r=>{ const i=Math.min(nBins-1, Math.floor((r.pity-1)/binW)); bins[i]++; });
+  const maxV = Math.max(...bins);
+  const W=720, H=210, padL=30, padB=26, padT=18;
+  const cw = (W-padL-8)/nBins;
+  const softX = padL + ((banner.soft5-1)/binW)*cw;
+  let rects='', labels='';
+  const grid = [0, Math.ceil(maxV/2), maxV].filter((v,i,a)=>a.indexOf(v)===i);
+  let gl = grid.map(v=>{
+    const y = padT + (H-padT-padB)*(1-(maxV?v/maxV:0));
+    return '<line x1="'+padL+'" y1="'+y+'" x2="'+W+'" y2="'+y+'" stroke="var(--line)" stroke-width="1" opacity=".55"/>'+
+           '<text x="'+(padL-7)+'" y="'+(y+4)+'" text-anchor="end" font-size="10.5" fill="var(--ink3)">'+v+'</text>';
+  }).join('');
+  bins.forEach((v,i)=>{
+    const x = padL + i*cw + 1;
+    const h = maxV? (H-padT-padB)*(v/maxV) : 0;
+    const y = H-padB-h;
+    rects += '<rect data-i="'+i+'" x="'+x.toFixed(1)+'" y="'+(v?y.toFixed(1):H-padB-1)+'" width="'+(cw-2).toFixed(1)+'" height="'+(v?h.toFixed(1):1)+'"'+
+      ' rx="3" fill="'+(v?'var(--gold-chart)':'var(--line)')+'"/>';
+    if(v===maxV && v>0) labels += '<text x="'+(x+(cw-2)/2)+'" y="'+(y-5)+'" text-anchor="middle" font-size="11" fill="var(--ink2)">'+v+'</text>';
+    if(i%3===0) labels += '<text x="'+(x+(cw-2)/2)+'" y="'+(H-8)+'" text-anchor="middle" font-size="10.5" fill="var(--ink3)">'+(i*binW+1)+'</text>';
+  });
+  let theo = '';
+  if(maxV>0){
+    let surv = 1; const centers = [];
+    for(let i=0;i<nBins;i++){
+      let pb = 0;
+      for(let n=i*binW+1;n<=Math.min(banner.max5,(i+1)*binW);n++){ const q=qModel(n,banner); pb+=surv*q; surv*=1-q; }
+      const cx = padL+i*cw+1+(cw-2)/2;
+      const cy = Math.max(padT, H-padB-(H-padT-padB)*Math.min(1, pb*r5.length/maxV));
+      centers.push(cx.toFixed(1)+','+cy.toFixed(1));
+    }
+    theo = '<polyline points="'+centers.join(' ')+'" fill="none" stroke="var(--ink2)" stroke-width="1.5" stroke-dasharray="4 4" opacity=".8" pointer-events="none"/>';
+  }
+  const svg = '<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="出金抽數分佈直方圖">'+
+    '<rect x="'+softX+'" y="'+padT+'" width="'+(W-softX)+'" height="'+(H-padT-padB)+'" fill="var(--gold)" opacity=".06"/>'+
+    '<text x="'+(softX+6)+'" y="'+(padT+12)+'" font-size="10.5" fill="var(--ink3)">軟保底區</text>'+
+    gl + rects + theo + labels +
+    '<line x1="'+padL+'" y1="'+(H-padB)+'" x2="'+W+'" y2="'+(H-padB)+'" stroke="var(--line)"/></svg>';
+  box.innerHTML = svg;
+  const tip = attachTip(box);
+  box.querySelectorAll('rect[data-i]').forEach(r=>{
+    r.addEventListener('mousemove', e=>{
+      const i=+r.dataset.i, lo=i*binW+1, hi=Math.min(banner.max5,(i+1)*binW);
+      tip.innerHTML = lo+'–'+hi+' 抽 · <b>'+bins[i]+'</b> 金';
+      const bb=box.getBoundingClientRect();
+      tip.style.left=(e.clientX-bb.left)+'px'; tip.style.top=(e.clientY-bb.top-6)+'px'; tip.style.opacity=1;
+    });
+    r.addEventListener('mouseleave', ()=>tip.style.opacity=0);
+  });
+}
+function renderMonthly(){
+  const box = document.getElementById('monthBox');
+  const keys = [];
+  const now = new Date();
+  for(let i=11;i>=0;i--){
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    keys.push(monthKey(d));
+  }
+  const vals = keys.map(k=>{
+    const m = state.monthly[k]||{};
+    return statsFilter==='all' ? Object.values(m).reduce((a,b)=>a+b,0) : (m[statsFilter]||0);
+  });
+  if(!vals.some(v=>v>0)){ box.innerHTML='<div class="empty">最近 12 個月沒有祈願紀錄</div>'; return; }
+  const maxV = Math.max(...vals);
+  const W=720, H=190, padL=34, padB=26, padT=14;
+  const cw = (W-padL-8)/12;
+  let rects='', labels='';
+  vals.forEach((v,i)=>{
+    const x = padL+i*cw+3;
+    const h = maxV? (H-padT-padB)*(v/maxV):0;
+    const y = H-padB-h;
+    rects += '<rect data-i="'+i+'" x="'+x.toFixed(1)+'" y="'+(v?y.toFixed(1):H-padB-1)+'" width="'+(cw-6).toFixed(1)+'" height="'+(v?h.toFixed(1):1)+'" rx="3" fill="'+(v?'var(--gold-chart)':'var(--line)')+'"/>';
+    labels += '<text x="'+(x+(cw-6)/2)+'" y="'+(H-8)+'" text-anchor="middle" font-size="10.5" fill="var(--ink3)">'+keys[i].slice(5)+'月</text>';
+    if(v===maxV) labels += '<text x="'+(x+(cw-6)/2)+'" y="'+(y-5)+'" text-anchor="middle" font-size="11" fill="var(--ink2)">'+v+'</text>';
+  });
+  box.innerHTML = '<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="每月祈願次數長條圖">'+rects+labels+
+    '<line x1="'+padL+'" y1="'+(H-padB)+'" x2="'+W+'" y2="'+(H-padB)+'" stroke="var(--line)"/></svg>';
+  const tip = attachTip(box);
+  box.querySelectorAll('rect[data-i]').forEach(r=>{
+    r.addEventListener('mousemove', e=>{
+      const i=+r.dataset.i;
+      tip.innerHTML = keys[i]+' · <b>'+vals[i]+'</b> 抽 · '+(vals[i]*160).toLocaleString()+' 原石';
+      const bb=box.getBoundingClientRect();
+      tip.style.left=(e.clientX-bb.left)+'px'; tip.style.top=(e.clientY-bb.top-6)+'px'; tip.style.opacity=1;
+    });
+    r.addEventListener('mouseleave', ()=>tip.style.opacity=0);
+  });
+}
+const VIA_LABEL = {win:'沒歪', lose:'歪', guaranteed:'大保底', radiance:'明光'};
+const recFilter = {q:'', rank:0};
+function renderRecChips(){
+  const wrap = document.getElementById('recRank');
+  wrap.innerHTML = '';
+  [[0,'全部'],[5,'★5'],[4,'★4']].forEach(([v,label])=>{
+    const c = document.createElement('button');
+    c.className = 'chip'; c.textContent = label;
+    c.setAttribute('aria-pressed', String(recFilter.rank===v));
+    c.onclick = ()=>{ recFilter.rank = v; renderRecords(bannerOf(statsFilter), state.banners[statsFilter]); };
+    wrap.appendChild(c);
+  });
+}
+function renderRecords(banner, b){
+  renderRecChips();
+  const wrap = document.getElementById('recTable');
+  const all = b.records.slice().reverse();
+  const q = recFilter.q.trim().toLowerCase();
+  const recs = all.filter(r=>
+    (!recFilter.rank || r.rarity===recFilter.rank) &&
+    (!q || (r.name||'').toLowerCase().includes(q)));
+  document.getElementById('recSub').textContent = banner.label+' · 五星與四星,由新到舊';
+  if(!all.length){ wrap.innerHTML='<div class="empty">尚無紀錄</div>'; return; }
+  if(!recs.length){ wrap.innerHTML='<div class="empty">沒有符合篩選的紀錄</div>'; return; }
+  const LIMIT = 120;
+  const rows = recs.slice(0,LIMIT).map(r=>{
+    const cls = r.rarity===5?'r5':'r4';
+    const via = r.via||r.result;
+    const pill = (r.rarity===5 && banner.has5050 && via)
+      ? '<span class="pill '+(via==='lose'?'lose':(via==='win'?'win':'gua'))+'">'+VIA_LABEL[via]+'</span>' : '';
+    return '<tr><td class="'+cls+'">'+'★'.repeat(r.rarity)+'</td>'+
+      '<td class="'+cls+'">'+esc(r.name||(r.rarity===5?'五星':'四星'))+'</td>'+
+      '<td class="pity-tag '+(r.rarity===5?pityClass(r.pity,banner.max5):'')+'">'+r.pity+' 抽</td>'+
+      '<td>'+pill+'</td><td style="color:var(--ink3)">'+esc(r.time||'—')+'</td></tr>';
+  }).join('');
+  wrap.innerHTML = '<table class="rec"><thead><tr><th>稀有度</th><th>名稱</th><th>抽數</th><th>結果</th><th>時間</th></tr></thead>'+
+    '<tbody>'+rows+'</tbody></table>'+
+    (recs.length>LIMIT?'<p style="font-size:12px;color:var(--ink3);margin:10px 0 0">僅顯示最近 '+LIMIT+' 筆,符合 '+recs.length+' 筆</p>':'');
+}
+document.getElementById('recSearch').addEventListener('input', e=>{
+  recFilter.q = e.target.value;
+  renderRecords(bannerOf(statsFilter), state.banners[statsFilter]);
+});
+
+/* ── 里程碑 ── */
+function renderMilestones(banner, b, r5){
+  document.getElementById('msSub').textContent = banner.label;
+  const box = document.getElementById('msBox');
+  if(!b.total){ box.innerHTML = '<div class="empty">尚無紀錄</div>'; return; }
+  const rows = [];
+  const dry = Math.max(b.pity5, 0, ...r5.map(r=>r.pity));
+  rows.push(['最長乾旱', dry+' 抽'+(dry>0 && b.pity5===dry ? '(進行中)' : '')]);
+  let bm = null;
+  Object.keys(state.monthly).forEach(mk=>{
+    const v = (state.monthly[mk]||{})[banner.key]||0;
+    if(v && (!bm || v>bm[1])) bm = [mk, v];
+  });
+  if(bm) rows.push(['單月最狂', bm[0]+' · '+bm[1]+' 抽']);
+  const raw5 = (state.raw[banner.key]||[]).filter(x=>x.rank===5);
+  if(raw5.length){
+    const byTime = {};
+    raw5.forEach(x=>{ byTime[x.time] = (byTime[x.time]||0)+1; });
+    const multi = Object.values(byTime).filter(n=>n>=2).length;
+    rows.push(['雙金十連', multi ? multi+' 次' : '還沒發生']);
+  }
+  if(banner.has5050){
+    let ws=0, ls=0, bw=0, bl=0;
+    r5.forEach(r=>{
+      const v = r.via||r.result;
+      if(v==='win'||v==='radiance'){ ws++; if(ws>bw) bw=ws; ls=0; }
+      else if(v==='lose'){ ls++; if(ls>bl) bl=ls; ws=0; }
+      else if(v==='guaranteed'){ ls=0; }
+    });
+    rows.push(['小保底連勝', bw ? bw+' 連' : '—']);
+    rows.push(['最慘連歪', bl+' 連']);
+  }
+  if(r5.length){
+    const first = r5[0], last = r5[r5.length-1];
+    rows.push(['首金', esc(first.name||'五星')+' · '+esc((first.time||'').slice(0,10))]);
+    rows.push(['最新金', esc(last.name||'五星')+' · '+esc((last.time||'').slice(0,10))]);
+  }
+  box.innerHTML = '<div class="ms-grid">'+rows.map(r=>
+    '<div class="ms-item"><span>'+r[0]+'</span><b>'+r[1]+'</b></div>').join('')+'</div>';
+}
+
+/* ═══════════════════ 模擬器 ═══════════════════ */
+let simBanner = 'character';
+let sim = null;
+function blankSim(){ return {pity5:0, pity4:0, guaranteed:false, guaranteed4:false, radiance:0, fate:0, total:0, fives:[]}; }
+function simReset(){ sim = blankSim(); renderSim();
+  document.getElementById('pullRow').innerHTML = '<div class="empty" style="grid-column:1/-1;border:none">尚未開始 — 按下方按鈕祈願</div>';
+  document.getElementById('simLog').innerHTML = '<div style="border:none;color:var(--ink3)">尚無紀錄</div>';
+}
+function p5chance(pity){
+  const n = pity+1;
+  if(simBanner==='weapon'){ if(n>=80) return 1; return n<63? 0.007 : Math.min(1, 0.007+0.07*(n-62)); }
+  if(n>=90) return 1; return n<74? 0.006 : Math.min(1, 0.006+0.06*(n-73));
+}
+function p4chance(pity4){ const n=pity4+1; if(n>=10) return 1; return n===9? 0.561 : 0.051; }
+function rollOnce(){
+  sim.total += 1;
+  if(Math.random() < p5chance(sim.pity5)){
+    const pity = sim.pity5+1;
+    sim.pity5 = 0; sim.pity4 += 1;
+    let name, via='';
+    if(simBanner==='character'){
+      if(sim.guaranteed){ name='UP 五星角色'; via='大保底'; sim.guaranteed=false; }
+      else if(sim.radiance>=2){ name='UP 五星角色'; via='明光'; sim.radiance=0; }
+      else if(Math.random()<0.5){ name='UP 五星角色'; via='沒歪'; sim.radiance=0; }
+      else { name='常駐五星'; via='歪'; sim.guaranteed=true; sim.radiance+=1; }
+    }else{
+      if(sim.fate>=1){ name='定軌目標武器'; via='命定值滿'; sim.fate=0; }
+      else{
+        const r = Math.random();
+        if(r<0.375){ name='定軌目標武器'; via='直接中'; }
+        else if(r<0.75){ name='另一把 UP 武器'; via='UP 但非定軌'; sim.fate=1; }
+        else { name='常駐五星武器'; via='歪'; sim.fate=1; }
+      }
+    }
+    sim.fives.push({pity, name, via, at:sim.total});
+    return {rarity:5, name};
+  }
+  if(Math.random() < p4chance(sim.pity4)){
+    sim.pity4 = 0; sim.pity5 += 1;
+    let name;
+    if(sim.guaranteed4){ name='UP 四星'; sim.guaranteed4=false; }
+    else if(Math.random()<0.5){ name='UP 四星'; }
+    else { name='其他四星'; sim.guaranteed4=true; }
+    return {rarity:4, name};
+  }
+  sim.pity5 += 1; sim.pity4 += 1;
+  return {rarity:3, name:'三星武器'};
+}
+function doPulls(n){
+  const results = [];
+  for(let i=0;i<n;i++) results.push(rollOnce());
+  showPulls(results);
+}
+function pullTo5(){
+  const results = [];
+  for(let i=0;i<90;i++){ const r=rollOnce(); results.push(r); if(r.rarity===5) break; }
+  showPulls(results.slice(-10), results.length);
+}
+function showPulls(results, totalRolled){
+  const row = document.getElementById('pullRow');
+  row.innerHTML = '';
+  const top = Math.max(...results.map(r=>r.rarity));
+  const meteor = document.getElementById('meteor');
+  meteor.style.setProperty('--mc', top===5?'var(--gold-bright)': top===4?'var(--purple)':'var(--blue)');
+  meteor.classList.remove('play'); void meteor.offsetWidth; meteor.classList.add('play');
+  results.forEach((r,i)=>{
+    const d = document.createElement('div');
+    d.className = 'pull-card q'+r.rarity;
+    d.style.animationDelay = (i*0.05)+'s';
+    d.innerHTML = '<div class="stars">'+'★'.repeat(r.rarity)+'</div><div class="p-name">'+r.name+'</div>';
+    row.appendChild(d);
+  });
+  if(totalRolled && totalRolled>results.length){
+    const note = document.createElement('div');
+    note.style.cssText='grid-column:1/-1;font-size:12.5px;color:var(--ink3)';
+    note.textContent = '這次連抽共 '+totalRolled+' 抽,顯示最後 '+results.length+' 抽';
+    row.appendChild(note);
+  }
+  renderSim();
+}
+function renderSim(){
+  const chips = document.getElementById('simChips');
+  chips.innerHTML='';
+  [['character','角色池'],['weapon','武器池']].forEach(([k,label])=>{
+    const c=document.createElement('button');
+    c.className='chip'; c.textContent=label;
+    c.setAttribute('aria-pressed', String(simBanner===k));
+    c.onclick=()=>{ simBanner=k; simReset(); };
+    chips.appendChild(c);
+  });
+  const gems = (sim.total*160).toLocaleString();
+  let stateStr = simBanner==='character'
+    ? (sim.guaranteed?'大保底':'小保底')+' · 明光 '+sim.radiance+'/2'
+    : '命定值 '+sim.fate+'/1';
+  document.getElementById('simMeta').innerHTML =
+    '<span>總抽數 <b>'+sim.total.toLocaleString()+'</b></span>'+
+    '<span>約 <b>'+gems+'</b> 原石</span>'+
+    '<span>五星保底 <b>'+sim.pity5+'</b></span>'+
+    '<span>四星保底 <b>'+sim.pity4+'</b></span>'+
+    '<span>'+stateStr+'</span>'+
+    '<span>已出五星 <b>'+sim.fives.length+'</b></span>';
+  if(sim.fives.length){
+    document.getElementById('simLog').innerHTML = sim.fives.slice().reverse().map(f=>
+      '<div><span class="r5">★5 '+f.name+'</span> — 第 '+f.pity+' 抽出金('+f.via+'),累計第 '+f.at+' 抽</div>').join('');
+  }
+}
+
+/* ═══════════════════ 資料頁 ═══════════════════ */
+function setupData(){
+  const drop = document.getElementById('drop');
+  const fi = document.getElementById('fileInput');
+  drop.onclick = ()=>fi.click();
+  drop.addEventListener('dragover', e=>{ e.preventDefault(); drop.classList.add('over'); });
+  drop.addEventListener('dragleave', ()=>drop.classList.remove('over'));
+  drop.addEventListener('drop', e=>{
+    e.preventDefault(); drop.classList.remove('over');
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if(f) readFile(f);
+  });
+  fi.onchange = ()=>{ if(fi.files[0]) readFile(fi.files[0]); fi.value=''; };
+  function readFile(f){
+    const rd = new FileReader();
+    rd.onload = ()=>{ try{ importUIGF(JSON.parse(String(rd.result).replace(/^\uFEFF/,''))); }catch(e){ toast('JSON 解析失敗:'+e.message); } };
+    rd.readAsText(f);
+  }
+  const io = document.getElementById('ioArea');
+  const copyBtn = document.getElementById('copyBtn');
+  document.getElementById('exportBtn').onclick = ()=>{
+    io.value = JSON.stringify({app:'wish-observatory', version:1, exported:nowStr(), state}, null, 1);
+    copyBtn.hidden = false;
+    io.focus(); io.select();
+    toast('備份已產生,可複製保存');
+  };
+  copyBtn.onclick = async ()=>{
+    try{ await navigator.clipboard.writeText(io.value); toast('已複製到剪貼簿'); }
+    catch(e){ io.focus(); io.select(); toast('請按 Ctrl+C 複製'); }
+  };
+  document.getElementById('restoreBtn').onclick = ()=>{
+    try{
+      const j = JSON.parse(io.value);
+      const s = j.state || j;
+      if(!s.banners) throw new Error('缺少 banners 欄位');
+      snapshot();
+      state = s;
+      // 補齊結構
+      const base = blankState();
+      state.banners = Object.assign(base.banners, state.banners);
+      BANNERS.forEach(b=>{ state.banners[b.key] = Object.assign(blankBanner(), state.banners[b.key]||{}); });
+      state.monthly = state.monthly||{};
+      state.raw = state.raw||{};
+      state.stdChars = state.stdChars||[];
+      save(); renderAll(); toast('還原成功');
+    }catch(e){ toast('還原失敗:'+e.message); }
+  };
+  document.getElementById('wipeBtn').onclick = ()=>{
+    if(!confirm('確定要清除全部資料?此動作無法復原(建議先產生備份)。')) return;
+    state = blankState();
+    try{ localStorage.removeItem(meta.active); }catch(e){}
+    undoStack.length = 0;
+    renderAll(); toast('已清除全部資料');
+  };
+  document.getElementById('uigfBtn').onclick = ()=>{
+    const keys = Object.keys(state.raw||{}).filter(k=>(state.raw[k]||[]).length);
+    if(!keys.length){ toast('沒有可匯出的官方紀錄(手動輸入的無法轉成 UIGF)'); return; }
+    const list = [];
+    keys.forEach(k=> state.raw[k].forEach(it=> list.push({
+      gacha_type: it.gt, uigf_gacha_type: (it.gt==='400'?'301':it.gt),
+      item_type: it.ty, name: it.name, rank_type: String(it.rank),
+      time: it.time, id: it.id, count: '1'
+    })));
+    list.sort((a,b)=> a.id.length!==b.id.length ? a.id.length-b.id.length : (a.id<b.id?-1:a.id>b.id?1:0));
+    io.value = JSON.stringify({info:{export_app:'wish-observatory', export_app_version:'1.2',
+      export_timestamp:Math.floor(Date.now()/1000), version:'v4.0'},
+      hk4e:[{uid:state.uid||'0', timezone:(state.tz!=null?state.tz:8), lang:state.lang||'zh-tw', list}]});
+    copyBtn.hidden = false; io.focus(); io.select();
+    toast('UIGF v4 已產生:'+list.length+' 筆,複製後存成 .json 即可');
+  };
+  document.getElementById('stdAdd').onclick = ()=>{
+    const inp = document.getElementById('stdInput');
+    const name = inp.value.trim();
+    if(!name) return;
+    state.stdChars = state.stdChars||[];
+    if(STD_CHARS.has(name) || state.stdChars.includes(name)){ toast('名單裡已經有了'); return; }
+    snapshot();
+    state.stdChars.push(name);
+    rebuildAllFromRaw();
+    save(); renderAll();
+    inp.value = '';
+    toast('已加入「'+name+'」並重新判定所有紀錄');
+  };
+}
+function renderStdChips(){
+  const wrap = document.getElementById('stdChips');
+  if(!wrap) return;
+  wrap.innerHTML = '';
+  STD_DISPLAY.forEach(n=>{
+    const c = document.createElement('span');
+    c.className = 'chip fixed'; c.textContent = n; c.title = '內建名單';
+    wrap.appendChild(c);
+  });
+  (state.stdChars||[]).forEach(n=>{
+    const c = document.createElement('button');
+    c.className = 'chip'; c.type = 'button'; c.title = '點擊移除';
+    c.innerHTML = esc(n)+'<span class="x">×</span>';
+    c.onclick = ()=>{
+      snapshot();
+      state.stdChars = state.stdChars.filter(x=>x!==n);
+      rebuildAllFromRaw();
+      save(); renderAll();
+      toast('已移除「'+n+'」並重新判定所有紀錄');
+    };
+    wrap.appendChild(c);
+  });
+}
+
+/* ═══════════════════ 共用 ═══════════════════ */
+let toastTimer=null;
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
+}
+function renderAll(){
+  document.getElementById('uidTag').textContent = state.uid? 'UID '+state.uid : '';
+  renderHero(); renderCards(); renderStdChips(); renderProfileBar();
+  if(!document.getElementById('tab-stats').hidden) renderStats();
+}
+/* ── 多帳號 ── */
+function profName(key){ const p = meta.profiles.find(x=>x.key===key); return p? p.name : '帳號'; }
+function renderProfileBar(){
+  const sel = document.getElementById('profileSel');
+  if(!sel) return;
+  sel.innerHTML = '';
+  meta.profiles.forEach(p=>{
+    const o = document.createElement('option');
+    o.value = p.key; o.textContent = p.name;
+    if(p.key===meta.active) o.selected = true;
+    sel.appendChild(o);
+  });
+  const o = document.createElement('option');
+  o.value = '__add'; o.textContent = '＋ 新增帳號…';
+  sel.appendChild(o);
+  const inp = document.getElementById('profName');
+  if(inp) inp.value = profName(meta.active);
+}
+function switchProfile(key){
+  if(key===meta.active){ renderProfileBar(); return; }
+  save();
+  meta.active = key; saveMeta();
+  state = load();
+  undoStack.length = 0;
+  planInited = false;
+  statsFilter = 'character';
+  renderAll();
+  fillGm();
+  toast('已切換到「'+profName(key)+'」');
+}
+function addProfile(){
+  const key = LS_KEY+':p'+Date.now().toString(36);
+  meta.profiles.push({key, name:'帳號 '+(meta.profiles.length+1)});
+  saveMeta();
+  switchProfile(key);
+  toast('已建立新帳號 — 可到「資料」分頁改名');
+}
+document.getElementById('profileSel').onchange = e=>{
+  const v = e.target.value;
+  if(v==='__add') addProfile();
+  else switchProfile(v);
+};
+document.getElementById('profRename').onclick = ()=>{
+  const name = document.getElementById('profName').value.trim();
+  if(!name){ toast('名稱不能是空的'); return; }
+  const p = meta.profiles.find(x=>x.key===meta.active);
+  p.name = name; saveMeta(); renderProfileBar();
+  toast('已改名為「'+name+'」');
+};
+document.getElementById('profAdd').onclick = addProfile;
+let profDelArmed = null;
+document.getElementById('profDel').onclick = ()=>{
+  if(meta.profiles.length<=1){ toast('至少要保留一個帳號'); return; }
+  if(profDelArmed!==meta.active){
+    profDelArmed = meta.active;
+    toast('確定刪除「'+profName(meta.active)+'」?4 秒內再按一次確認');
+    setTimeout(()=>{ profDelArmed = null; }, 4000);
+    return;
+  }
+  const dead = meta.active;
+  try{ localStorage.removeItem(dead); }catch(e){}
+  meta.profiles = meta.profiles.filter(p=>p.key!==dead);
+  meta.active = meta.profiles[0].key;
+  saveMeta();
+  state = load();
+  undoStack.length = 0;
+  planInited = false;
+  renderAll();
+  fillGm();
+  toast('已刪除,切換到「'+profName(meta.active)+'」');
+};
+/* tabs */
+document.querySelectorAll('nav.tabs button').forEach(btn=>{
+  btn.onclick = ()=>{
+    document.querySelectorAll('nav.tabs button').forEach(b=>b.setAttribute('aria-selected','false'));
+    btn.setAttribute('aria-selected','true');
+    ['track','stats','plan','sim','data'].forEach(k=>{
+      document.getElementById('tab-'+k).hidden = (k!==btn.dataset.tab);
+    });
+    if(btn.dataset.tab==='stats') renderStats();
+    if(btn.dataset.tab==='plan'){ renderPlanChips(); if(!planInited){ planInited = true; syncPlan(); } }
+  };
+});
+/* dialog */
+document.getElementById('dlgSave').onclick = save5;
+document.getElementById('dlgCancel').onclick = ()=>document.getElementById('dlg5').close();
+document.getElementById('pull1').onclick = ()=>doPulls(1);
+document.getElementById('pull10').onclick = ()=>doPulls(10);
+document.getElementById('pullTo5').onclick = pullTo5;
+document.getElementById('simReset').onclick = simReset;
+
+/* ═══════════════════ 抽卡規劃器 ═══════════════════ */
+let planBanner = 'character', planInited = false;
+function renderPlanChips(){
+  const wrap = document.getElementById('planChips');
+  wrap.innerHTML = '';
+  [['character','角色池'],['weapon','武器池']].forEach(([k,label])=>{
+    const c = document.createElement('button');
+    c.className = 'chip'; c.textContent = label;
+    c.setAttribute('aria-pressed', String(planBanner===k));
+    c.onclick = ()=>{ planBanner = k; renderPlanChips(); syncPlan(); };
+    wrap.appendChild(c);
+  });
+  const ch = planBanner==='character';
+  document.getElementById('plGuarWrap').hidden = !ch;
+  document.getElementById('plRadWrap').hidden = !ch;
+  document.getElementById('plFateWrap').hidden = ch;
+}
+function syncPlan(){
+  const b = state.banners[planBanner];
+  document.getElementById('plPity').value = b.pity5;
+  document.getElementById('plGuar').value = b.guaranteed? '1':'0';
+  document.getElementById('plRad').value = String(Math.min(2, b.radiance||0));
+}
+function planQ(k){
+  if(planBanner==='weapon'){ if(k>=80) return 1; return k<63? 0.007 : Math.min(1, 0.007+0.07*(k-62)); }
+  if(k>=90) return 1; return k<74? 0.006 : Math.min(1, 0.006+0.06*(k-73));
+}
+function planTrial(cfg){
+  let pity=cfg.pity, guar=cfg.guar, rad=cfg.rad, fate=cfg.fate, got=0, pulls=0;
+  const cap = cfg.target*200+200;
+  while(got<cfg.target && pulls<cap){
+    pulls++; pity++;
+    if(Math.random()<planQ(pity)){
+      if(planBanner==='character'){
+        if(guar){ got++; guar=false; }
+        else if(rad>=2){ got++; rad=0; }
+        else if(Math.random()<0.5){ got++; rad=0; }
+        else { guar=true; rad++; }
+      }else{
+        if(fate>=1){ got++; fate=0; }
+        else if(Math.random()<0.375){ got++; }
+        else { fate=1; }
+      }
+      pity=0;
+    }
+  }
+  return pulls;
+}
+function runPlan(){
+  const cfg = {
+    pity:Math.max(0, +document.getElementById('plPity').value||0),
+    guar:planBanner==='character' && document.getElementById('plGuar').value==='1',
+    rad:planBanner==='character' ? (+document.getElementById('plRad').value||0) : 0,
+    fate:planBanner==='weapon' ? (+document.getElementById('plFate').value||0) : 0,
+    target:+document.getElementById('plTarget').value||1
+  };
+  const budget = Math.max(0, +document.getElementById('plBudget').value||0);
+  const T = 30000, res = new Array(T);
+  for(let i=0;i<T;i++) res[i] = planTrial(cfg);
+  res.sort((a,b)=>a-b);
+  const pct = q=>res[Math.min(T-1, Math.floor(T*q))];
+  const mean = res.reduce((s,v)=>s+v,0)/T;
+  const withIn = budget>0 ? res.reduce((c,v)=>c+(v<=budget?1:0),0)/T : null;
+  const tiles = [];
+  if(withIn!=null) tiles.push(['以 '+budget+' 抽達成', (withIn*100).toFixed(1)+'%','',true]);
+  tiles.push(['期望抽數', Math.round(mean), '抽', withIn==null]);
+  tiles.push(['50% 把握', pct(0.5), '抽', false]);
+  tiles.push(['90% 把握', pct(0.9), '抽', false]);
+  tiles.push(['99% 把握', pct(0.99), '抽', false]);
+  tiles.push(['90% 把握原石', (pct(0.9)*160).toLocaleString(), '', false]);
+  document.getElementById('planTiles').innerHTML = tiles.map(t=>
+    '<div class="tile'+(t[3]?' accent':'')+'"><div class="t-label">'+t[0]+'</div>'+
+    '<div class="t-value">'+t[1]+(t[2]?'<small>'+t[2]+'</small>':'')+'</div></div>').join('');
+  document.getElementById('planChartCard').hidden = false;
+  document.getElementById('planSub').textContent =
+    (planBanner==='character'?'角色池':'武器池')+' · 目標 '+cfg.target+' 隻 UP · 已墊 '+cfg.pity+' 抽'+
+    (cfg.guar?' · 大保底':'')+(cfg.rad?' · 明光 '+cfg.rad+'/2':'')+(cfg.fate?' · 命定值 1':'');
+  renderPlanChart(res, budget, T);
+}
+function renderPlanChart(res, budget, T){
+  const box = document.getElementById('planBox');
+  const xmax = Math.max(budget||0, res[Math.floor(T*0.995)], 10);
+  const W=720, H=230, padL=44, padB=28, padT=18, padR=16;
+  const pts = new Array(xmax+1);
+  let j = 0;
+  for(let x=0;x<=xmax;x++){ while(j<T && res[j]<=x) j++; pts[x]=j/T; }
+  const X = x=>padL+(W-padL-padR)*(x/xmax);
+  const Y = p=>padT+(H-padT-padB)*(1-p);
+  let line = 'M'+X(0).toFixed(1)+' '+Y(pts[0]).toFixed(1);
+  for(let x=1;x<=xmax;x++) line += 'L'+X(x).toFixed(1)+' '+Y(pts[x]).toFixed(1);
+  const area = line+'L'+X(xmax).toFixed(1)+' '+Y(0).toFixed(1)+'L'+X(0).toFixed(1)+' '+Y(0).toFixed(1)+'Z';
+  let g = '';
+  [0.25,0.5,0.75,1].forEach(p=>{
+    g += '<line x1="'+padL+'" y1="'+Y(p).toFixed(1)+'" x2="'+(W-padR)+'" y2="'+Y(p).toFixed(1)+'" stroke="var(--line)" stroke-width="1" opacity=".5"/>'+
+         '<text x="'+(padL-7)+'" y="'+(Y(p)+4).toFixed(1)+'" text-anchor="end" font-size="10.5" fill="var(--ink3)">'+(p*100)+'%</text>';
+  });
+  const step = Math.max(10, Math.ceil(xmax/60)*10);
+  for(let x=0;x<=xmax;x+=step)
+    g += '<text x="'+X(x).toFixed(1)+'" y="'+(H-8)+'" text-anchor="middle" font-size="10.5" fill="var(--ink3)">'+x+'</text>';
+  let marker = '';
+  if(budget>0){
+    const bx = Math.min(budget, xmax), p = pts[bx];
+    marker = '<line x1="'+X(bx).toFixed(1)+'" y1="'+padT+'" x2="'+X(bx).toFixed(1)+'" y2="'+(H-padB)+'" stroke="var(--gold-bright)" stroke-width="1.5" stroke-dasharray="5 4"/>'+
+      '<text x="'+Math.min(W-padR-40, Math.max(padL+40, X(bx))).toFixed(1)+'" y="'+(padT-4)+'" text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--gold-bright)">'+budget+' 抽 → '+(p*100).toFixed(1)+'%</text>';
+  }
+  box.innerHTML = '<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="累積出貨機率曲線">'+
+    g+'<path d="'+area+'" fill="var(--gold-chart)" opacity=".18"/>'+
+    '<path d="'+line+'" fill="none" stroke="var(--gold-chart)" stroke-width="2"/>'+marker+
+    '<line x1="'+padL+'" y1="'+(H-padB)+'" x2="'+(W-padR)+'" y2="'+(H-padB)+'" stroke="var(--line)"/>'+
+    '<rect class="plan-hover" x="'+padL+'" y="'+padT+'" width="'+(W-padL-padR)+'" height="'+(H-padT-padB)+'" fill="transparent"/></svg>';
+  const tip = attachTip(box);
+  const svg = box.querySelector('svg'), hov = box.querySelector('.plan-hover');
+  hov.addEventListener('mousemove', e=>{
+    const bb = svg.getBoundingClientRect();
+    const fx = (e.clientX-bb.left)/bb.width*W;
+    const x = Math.max(0, Math.min(xmax, Math.round((fx-padL)/(W-padL-padR)*xmax)));
+    tip.innerHTML = '第 <b>'+x+'</b> 抽內 · <b>'+(pts[x]*100).toFixed(1)+'%</b>';
+    const bb2 = box.getBoundingClientRect();
+    tip.style.left = (e.clientX-bb2.left)+'px'; tip.style.top = (e.clientY-bb2.top-6)+'px'; tip.style.opacity = 1;
+  });
+  hov.addEventListener('mouseleave', ()=>tip.style.opacity=0);
+}
+document.getElementById('plCalc').onclick = runPlan;
+document.getElementById('plSync').onclick = ()=>{ syncPlan(); toast('已帶入追蹤頁的保底狀態'); };
+/* ── 原石存抽計算 ── */
+function fillGm(){
+  const gm = state.gm||{};
+  document.getElementById('gmPrimo').value = gm.primo||0;
+  document.getElementById('gmFate').value = gm.fate||0;
+  document.getElementById('gmDaily').value = (gm.daily!=null? gm.daily : 60);
+  document.getElementById('gmDate').value = gm.date||'';
+}
+function gmCompute(apply){
+  const primo = Math.max(0, +document.getElementById('gmPrimo').value||0);
+  const fate = Math.max(0, +document.getElementById('gmFate').value||0);
+  const daily = Math.max(0, +document.getElementById('gmDaily').value||0);
+  const dv = document.getElementById('gmDate').value;
+  let days = 0;
+  if(dv){
+    const d = new Date(dv+'T23:59:00');
+    days = Math.max(0, Math.ceil((d.getTime()-Date.now())/86400000));
+  }
+  const nowPulls = fate + Math.floor(primo/160);
+  const futPulls = fate + Math.floor((primo + days*daily)/160);
+  let msg = '現在可抽 <b>'+nowPulls+'</b> 抽';
+  if(dv && days>0) msg += ';存到 '+dv+'(還有 '+days+' 天)約 <b>'+futPulls+'</b> 抽(+'+(futPulls-nowPulls)+')';
+  else if(dv) msg += ';目標日期已到,即為現在的 <b>'+nowPulls+'</b> 抽';
+  document.getElementById('gmOut').innerHTML = msg;
+  state.gm = {primo, fate, daily, date:dv};
+  save();
+  if(apply){
+    document.getElementById('plBudget').value = futPulls;
+    toast('已把 '+futPulls+' 抽帶入預算,按「計算機率」更新結果');
+  }
+}
+document.getElementById('gmCalc').onclick = ()=>gmCompute(false);
+document.getElementById('gmApply').onclick = ()=>gmCompute(true);
+fillGm();
+
+/* ═══════════════════ 回顧卡 ═══════════════════ */
+function openShare(){
+  const banner = bannerOf(statsFilter), b = state.banners[statsFilter];
+  const r5 = b.records.filter(r=>r.rarity===5);
+  const L = computeLuck(banner, r5);
+  const totalAll = BANNERS.reduce((s,x)=>s+state.banners[x.key].total, 0);
+  if(!totalAll){ toast('還沒有任何紀錄,先記幾抽或匯入資料吧'); return; }
+  let t0=null, t1=null;
+  Object.values(state.raw||{}).forEach(arr=>(arr||[]).forEach(x=>{
+    const d = (x.time||'').slice(0,10);
+    if(d){ if(!t0||d<t0) t0=d; if(!t1||d>t1) t1=d; }
+  }));
+  const rows = [];
+  rows.push(['帳號總祈願', totalAll.toLocaleString()+' 抽']);
+  rows.push(['等值原石', (totalAll*160).toLocaleString()]);
+  rows.push([banner.label, b.total.toLocaleString()+' 抽 · '+r5.length+' 金']);
+  if(L) rows.push(['平均出金', L.avg.toFixed(1)+' 抽(理論 '+L.mean.toFixed(1)+')']);
+  if(banner.has5050){
+    const w = r5.filter(r=>r.result==='win').length, l = r5.filter(r=>r.result==='lose').length;
+    if(w+l) rows.push(['小保底', w+' 勝 '+l+' 歪']);
+  }
+  if(r5.length){
+    const best = r5.reduce((a,r)=>r.pity<a.pity?r:a);
+    const worst = r5.reduce((a,r)=>r.pity>a.pity?r:a);
+    rows.push(['最歐一抽', esc(best.name||'五星')+' · '+best.pity+' 抽']);
+    rows.push(['最深一井', esc(worst.name||'五星')+' · '+worst.pity+' 抽']);
+  }
+  const stars = [[8,12],[86,6],[62,30],[18,84],[90,78],[40,94],[74,90]].map(p=>
+    '<span class="sc-star" style="left:'+p[0]+'%;top:'+p[1]+'%">✦</span>').join('');
+  document.getElementById('shareCard').innerHTML = stars+
+    '<div class="sc-head"><b>祈願觀測站</b><span>WISH&nbsp;OBS.</span></div>'+
+    '<div class="sc-tier">'+(L? L.tier : '旅行者')+'</div>'+
+    '<div class="sc-beat">'+(L? '運氣贏過 '+L.beat+'% 的理論旅行者' : '樣本不足,再多抽一點')+'</div>'+
+    rows.map(r=>'<div class="sc-row"><span>'+r[0]+'</span><b>'+r[1]+'</b></div>').join('')+
+    '<div class="sc-foot">'+(t0? t0+' ～ '+t1 : '')+(state.uid? ' · UID '+state.uid : '')+'</div>';
+  document.getElementById('shareOverlay').hidden = false;
+}
+function closeShare(){ document.getElementById('shareOverlay').hidden = true; }
+document.getElementById('shareBtn').onclick = openShare;
+document.getElementById('shareClose').onclick = closeShare;
+document.getElementById('shareOverlay').addEventListener('click', e=>{
+  if(e.target===e.currentTarget) closeShare();
+});
+
+/* ═══════════════════ 鍵盤快捷鍵 ═══════════════════ */
+document.addEventListener('keydown', e=>{
+  if(!document.getElementById('shareOverlay').hidden){
+    if(e.key==='Escape') closeShare();
+    return;
+  }
+  if(document.getElementById('tab-track').hidden) return;
+  if(document.getElementById('dlg5').open) return;
+  const t = e.target;
+  if(t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
+  if(e.ctrlKey || e.metaKey || e.altKey) return;
+  if(e.key==='1') addPulls('character', 1);
+  else if(e.key==='0') addPulls('character', 10);
+  else if(e.key==='4') log4('character');
+  else if(e.key==='5') open5Dialog('character');
+  else if(e.key==='z' || e.key==='Z') undo();
+});
+
+/* ═══════════════════ 星空背景 ═══════════════════ */
+(function(){
+  const cv = document.getElementById('sky');
+  const ctx = cv.getContext('2d');
+  let stars = [];
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function resize(){
+    cv.width = innerWidth; cv.height = innerHeight;
+    const n = Math.min(180, Math.floor(innerWidth*innerHeight/9000));
+    stars = Array.from({length:n}, ()=>({
+      x:Math.random()*cv.width, y:Math.random()*cv.height,
+      r:Math.random()*1.3+0.3, base:Math.random()*0.5+0.25,
+      sp:Math.random()*1.6+0.4, ph:Math.random()*Math.PI*2,
+      gold:Math.random()<0.12
+    }));
+  }
+  function draw(t){
+    ctx.clearRect(0,0,cv.width,cv.height);
+    stars.forEach(s=>{
+      const tw = reduced? 1 : (0.65 + 0.35*Math.sin(t/1000*s.sp + s.ph));
+      ctx.globalAlpha = s.base*tw;
+      ctx.fillStyle = s.gold? '#e6b34c' : '#cdd3ee';
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI*2); ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+    if(!reduced) requestAnimationFrame(draw);
+  }
+  addEventListener('resize', resize);
+  resize();
+  requestAnimationFrame(draw);
+})();
+
+/* init */
+sim = blankSim();
+setupData();
+renderAll();
+renderSim();
+</script>
+</body>
+</html>
