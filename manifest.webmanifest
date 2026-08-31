@@ -1,0 +1,14 @@
+{
+  "name": "祈願觀測站",
+  "short_name": "祈願觀測站",
+  "description": "原神祈願追蹤:保底、統計、規劃、模擬",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#0d1124",
+  "theme_color": "#0d1124",
+  "icons": [
+    {"src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"},
+    {"src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable"}
+  ]
+}

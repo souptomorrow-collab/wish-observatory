@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="原神祈願追蹤工具:保底計數、捕獲明光、UIGF 匯入匯出、統計圖表、抽卡規劃與模擬器。純前端、資料只存本機。">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌠</text></svg>">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0d1124">
 <title>祈願觀測站</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;800&family=Noto+Serif+TC:wght@700;900&family=Noto+Sans+TC:wght@400;500;700&display=swap">
 <style>
@@ -498,7 +500,8 @@ footer{margin-top:60px; font-size:12px; color:var(--ink3); text-align:center; li
 <div id="shareOverlay" class="share-overlay" hidden>
   <div class="share-card" id="shareCard"></div>
   <div class="share-actions">
-    <span>截圖保存這張卡 ✦</span>
+    <button class="btn primary" id="shareDl">下載 PNG</button>
+    <span>或直接截圖 ✦</span>
     <button class="btn" id="shareClose">關閉</button>
   </div>
 </div>
@@ -1714,19 +1717,81 @@ function openShare(){
   if(r5.length){
     const best = r5.reduce((a,r)=>r.pity<a.pity?r:a);
     const worst = r5.reduce((a,r)=>r.pity>a.pity?r:a);
-    rows.push(['最歐一抽', esc(best.name||'五星')+' · '+best.pity+' 抽']);
-    rows.push(['最深一井', esc(worst.name||'五星')+' · '+worst.pity+' 抽']);
+    rows.push(['最歐一抽', (best.name||'五星')+' · '+best.pity+' 抽']);
+    rows.push(['最深一井', (worst.name||'五星')+' · '+worst.pity+' 抽']);
   }
+  shareData = {
+    tier: L? L.tier : '旅行者',
+    beat: L? '運氣贏過 '+L.beat+'% 的理論旅行者' : '樣本不足,再多抽一點',
+    rows,
+    foot: (t0? t0+' ～ '+t1 : '')+(state.uid? ' · UID '+state.uid : '')
+  };
   const stars = [[8,12],[86,6],[62,30],[18,84],[90,78],[40,94],[74,90]].map(p=>
     '<span class="sc-star" style="left:'+p[0]+'%;top:'+p[1]+'%">✦</span>').join('');
   document.getElementById('shareCard').innerHTML = stars+
     '<div class="sc-head"><b>祈願觀測站</b><span>WISH&nbsp;OBS.</span></div>'+
-    '<div class="sc-tier">'+(L? L.tier : '旅行者')+'</div>'+
-    '<div class="sc-beat">'+(L? '運氣贏過 '+L.beat+'% 的理論旅行者' : '樣本不足,再多抽一點')+'</div>'+
-    rows.map(r=>'<div class="sc-row"><span>'+r[0]+'</span><b>'+r[1]+'</b></div>').join('')+
-    '<div class="sc-foot">'+(t0? t0+' ～ '+t1 : '')+(state.uid? ' · UID '+state.uid : '')+'</div>';
+    '<div class="sc-tier">'+esc(shareData.tier)+'</div>'+
+    '<div class="sc-beat">'+esc(shareData.beat)+'</div>'+
+    rows.map(r=>'<div class="sc-row"><span>'+esc(r[0])+'</span><b>'+esc(r[1])+'</b></div>').join('')+
+    '<div class="sc-foot">'+esc(shareData.foot)+'</div>';
   document.getElementById('shareOverlay').hidden = false;
 }
+let shareData = null;
+async function downloadShareCard(){
+  if(!shareData){ toast('先按「回顧卡」產生內容'); return; }
+  try{ await document.fonts.ready; }catch(e){}
+  const W = 680, H = 980;
+  const cv = document.createElement('canvas');
+  cv.width = W; cv.height = H;
+  const ctx = cv.getContext('2d');
+  const g = ctx.createLinearGradient(0, 0, W*0.4, H);
+  g.addColorStop(0, '#1e2547'); g.addColorStop(0.62, '#0d1124'); g.addColorStop(1, '#0d1124');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.roundRect(0, 0, W, H, 36); ctx.fill();
+  ctx.strokeStyle = 'rgba(230,179,76,.55)'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.roundRect(1.5, 1.5, W-3, H-3, 34); ctx.stroke();
+  ctx.fillStyle = 'rgba(230,179,76,.3)'; ctx.font = '26px serif'; ctx.textAlign = 'center';
+  [[60,120],[590,70],[420,300],[120,830],[610,760],[280,930],[500,880]].forEach(p=>ctx.fillText('✦', p[0], p[1]));
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#ffd166'; ctx.font = '900 34px "Noto Serif TC", serif';
+  ctx.fillText('祈願觀測站', 52, 88);
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#716f90'; ctx.font = '16px Cinzel, serif';
+  ctx.fillText('WISH OBS.', W-52, 86);
+  ctx.textAlign = 'center';
+  ctx.shadowColor = 'rgba(255,209,102,.4)'; ctx.shadowBlur = 42;
+  ctx.fillStyle = '#ffd166'; ctx.font = '900 88px "Noto Serif TC", serif';
+  ctx.fillText(shareData.tier, W/2, 236);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#a9a7c6'; ctx.font = '24px "Noto Sans TC", sans-serif';
+  ctx.fillText(shareData.beat, W/2, 286);
+  let y = 366;
+  shareData.rows.forEach(r=>{
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#716f90'; ctx.font = '24px "Noto Sans TC", sans-serif';
+    ctx.fillText(r[0], 56, y);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#eae8f4'; ctx.font = '500 26px "Noto Sans TC", sans-serif';
+    ctx.fillText(r[1], W-56, y);
+    ctx.strokeStyle = 'rgba(42,49,84,.7)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(52, y+20); ctx.lineTo(W-52, y+20); ctx.stroke();
+    y += 62;
+  });
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#716f90'; ctx.font = '19px "Noto Sans TC", sans-serif';
+  ctx.fillText(shareData.foot, W/2, H-48);
+  cv.toBlob(b=>{
+    if(!b){ toast('產生圖片失敗'); return; }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(b);
+    a.download = '祈願回顧卡.png';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+    toast('已下載回顧卡 PNG');
+  });
+}
+document.getElementById('shareDl').onclick = downloadShareCard;
+if(window.self!==window.top) document.getElementById('shareDl').hidden = true;  // 內嵌環境擋下載,改用截圖
 function closeShare(){ document.getElementById('shareOverlay').hidden = true; }
 document.getElementById('shareBtn').onclick = openShare;
 document.getElementById('shareClose').onclick = closeShare;
@@ -1994,6 +2059,9 @@ sim = blankSim();
 setupData();
 renderAll();
 renderSim();
+if('serviceWorker' in navigator && location.protocol==='https:'){
+  navigator.serviceWorker.register('sw.js').catch(function(){});
+}
 </script>
 </body>
 </html>
