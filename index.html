@@ -430,6 +430,30 @@ footer{margin-top:60px; font-size:12px; color:var(--ink3); text-align:center; li
   </div>
 
   <div class="card data-sec">
+    <h3>Google 雲端同步</h3>
+    <p>把<b>所有帳號</b>的紀錄備份到你自己的 Google 雲端硬碟。使用「應用程式資料夾」授權 — 本工具只能存取自己建立的隱藏資料夾,看不到你雲端裡的任何其他檔案。換電腦或換瀏覽器時按「從雲端還原」即可接續。</p>
+    <div style="margin-bottom:10px">
+      <input type="text" id="gClientId" class="txt" style="width:100%" placeholder="貼上你的 Google OAuth Client ID(xxxx.apps.googleusercontent.com)" aria-label="Google OAuth Client ID">
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn primary" id="gUploadBtn">上傳備份到雲端</button>
+      <button class="btn" id="gDownloadBtn">從雲端還原</button>
+    </div>
+    <p id="gStatus" style="font-size:12.5px;color:var(--ink3);margin:10px 0 0"></p>
+    <details class="model">
+      <summary>第一次使用?建立 Client ID 的步驟(約 5 分鐘,免費)</summary>
+      <ol style="margin:8px 0 0;padding-left:20px;line-height:2">
+        <li>開 console.cloud.google.com,登入後「建立專案」(名稱隨意)</li>
+        <li>左側「API 和服務 → 程式庫」,搜尋 <b>Google Drive API</b> → 啟用</li>
+        <li>「OAuth 同意畫面」:使用者類型選<b>外部</b>,填應用程式名稱與自己的信箱;在「測試使用者」加入自己的 Gmail</li>
+        <li>「憑證 → 建立憑證 → OAuth 用戶端 ID」:應用程式類型選<b>網頁應用程式</b>,「已授權的 JavaScript 來源」加上 <b>https://souptomorrow-collab.github.io</b></li>
+        <li>建立後複製「用戶端 ID」貼到上方欄位,按「上傳備份到雲端」完成首次授權</li>
+      </ol>
+      <p style="margin-top:8px">注意:此功能需在線上版網址使用(本機直接開檔案無法通過 Google 的來源驗證)。</p>
+    </details>
+  </div>
+
+  <div class="card data-sec">
     <h3>帳號管理</h3>
     <p>每個帳號的紀錄各自獨立保存(含備份、常駐名單設定),右上角可隨時切換。</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -1675,6 +1699,123 @@ document.addEventListener('keydown', e=>{
   else if(e.key==='5') open5Dialog('character');
   else if(e.key==='z' || e.key==='Z') undo();
 });
+
+/* ═══════════════════ Google 雲端同步 ═══════════════════ */
+const G_KEY = 'wish-observatory-gsync';
+let gCfg = {};
+try{ gCfg = JSON.parse(localStorage.getItem(G_KEY)||'{}'); }catch(e){}
+let gToken = null;
+function gSave(){ try{ localStorage.setItem(G_KEY, JSON.stringify(gCfg)); }catch(e){} }
+function gStatus(msg){ document.getElementById('gStatus').textContent = msg; }
+function loadGis(){
+  return new Promise((res, rej)=>{
+    if(window.google && google.accounts) return res();
+    const s = document.createElement('script');
+    s.src = 'https://accounts.google.com/gsi/client';
+    s.onload = ()=>res();
+    s.onerror = ()=>rej(new Error('無法載入 Google 登入元件 — 請改用 GitHub Pages 網址開啟本站'));
+    document.head.appendChild(s);
+  });
+}
+function getGToken(){
+  return new Promise((res, rej)=>{
+    const cid = document.getElementById('gClientId').value.trim();
+    if(!cid){ rej(new Error('請先貼上 Client ID(展開下方步驟說明)')); return; }
+    gCfg.clientId = cid; gSave();
+    if(gToken && gToken.exp > Date.now()+60000) return res(gToken.t);
+    loadGis().then(()=>{
+      const tc = google.accounts.oauth2.initTokenClient({
+        client_id: cid,
+        scope: 'https://www.googleapis.com/auth/drive.appdata',
+        callback: resp=>{
+          if(resp.error){ rej(new Error('授權失敗:'+resp.error)); return; }
+          gToken = {t:resp.access_token, exp:Date.now()+(resp.expires_in||3600)*1000};
+          gCfg.granted = true; gSave();
+          res(gToken.t);
+        }
+      });
+      tc.requestAccessToken({prompt: gCfg.granted ? '' : 'consent'});
+    }).catch(rej);
+  });
+}
+async function gFind(token){
+  const r = await fetch("https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name%3D'wish-observatory-backup.json'&fields=files(id,modifiedTime)",
+    {headers:{Authorization:'Bearer '+token}});
+  const j = await r.json();
+  if(j.error) throw new Error(j.error.message);
+  return (j.files && j.files[0]) || null;
+}
+function fullExport(){
+  save();
+  const states = {};
+  meta.profiles.forEach(p=>{
+    try{ const s = localStorage.getItem(p.key); if(s) states[p.key] = JSON.parse(s); }catch(e){}
+  });
+  return {app:'wish-observatory', kind:'cloud-backup', version:1, exported:nowStr(),
+    meta:{active:meta.active, profiles:meta.profiles}, states};
+}
+function fullRestore(j){
+  if(!j || j.app!=='wish-observatory' || !j.states) throw new Error('雲端檔案格式不符');
+  Object.keys(j.states).forEach(k=>{
+    try{ localStorage.setItem(k, JSON.stringify(j.states[k])); }catch(e){}
+  });
+  if(j.meta && j.meta.profiles && j.meta.profiles.length){
+    meta = {active:j.meta.active, profiles:j.meta.profiles};
+    if(!meta.profiles.find(p=>p.key===meta.active)) meta.active = meta.profiles[0].key;
+    saveMeta();
+  }
+  state = load();
+  undoStack.length = 0; planInited = false;
+  renderAll(); fillGm();
+}
+async function gUploadRun(){
+  try{
+    gStatus('連接 Google…');
+    const token = await getGToken();
+    gStatus('上傳中…');
+    const data = JSON.stringify(fullExport());
+    const found = await gFind(token);
+    let r;
+    if(found){
+      r = await fetch('https://www.googleapis.com/upload/drive/v3/files/'+found.id+'?uploadType=media',
+        {method:'PATCH', headers:{Authorization:'Bearer '+token, 'Content-Type':'application/json'}, body:data});
+    }else{
+      const boundary = 'wobs'+Date.now();
+      const body = '--'+boundary+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+
+        JSON.stringify({name:'wish-observatory-backup.json', parents:['appDataFolder']})+
+        '\r\n--'+boundary+'\r\nContent-Type: application/json\r\n\r\n'+data+'\r\n--'+boundary+'--';
+      r = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+        {method:'POST', headers:{Authorization:'Bearer '+token, 'Content-Type':'multipart/related; boundary='+boundary}, body});
+    }
+    const j = await r.json();
+    if(j.error) throw new Error(j.error.message);
+    gCfg.lastSync = nowStr(); gSave();
+    gStatus('上次上傳:'+gCfg.lastSync);
+    toast('已上傳到你的 Google 雲端');
+  }catch(e){ gStatus('✗ '+e.message); toast('上傳失敗:'+e.message); }
+}
+async function gDownloadRun(){
+  try{
+    gStatus('連接 Google…');
+    const token = await getGToken();
+    const found = await gFind(token);
+    if(!found) throw new Error('雲端上還沒有備份 — 先在原本的裝置按「上傳備份到雲端」');
+    gStatus('下載中…');
+    const r = await fetch('https://www.googleapis.com/drive/v3/files/'+found.id+'?alt=media',
+      {headers:{Authorization:'Bearer '+token}});
+    const j = await r.json();
+    fullRestore(j);
+    gStatus('已還原雲端備份(雲端版本時間:'+String(found.modifiedTime||'').slice(0,16).replace('T',' ')+')');
+    toast('已從雲端還原全部帳號資料');
+  }catch(e){ gStatus('✗ '+e.message); toast('還原失敗:'+e.message); }
+}
+document.getElementById('gUploadBtn').onclick = gUploadRun;
+document.getElementById('gDownloadBtn').onclick = gDownloadRun;
+if(gCfg.clientId){
+  document.getElementById('gClientId').value = gCfg.clientId;
+  loadGis().catch(()=>{});  // 預載,讓授權彈窗保有點擊手勢
+}
+if(gCfg.lastSync) gStatus('上次上傳:'+gCfg.lastSync);
 
 /* ═══════════════════ 星空背景 ═══════════════════ */
 (function(){
