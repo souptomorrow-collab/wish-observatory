@@ -6,6 +6,7 @@
 # ══════════════════════════════════════════════════════════════
 param([switch]$Silent)   # -Silent:排程背景模式,不暫停等待、結果寫入 fetch.log
 $ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'   # 關掉每次網路請求的藍色進度橫幅(閃爍來源,且拖慢下載)
 function Read-SharedText($path){
   # 遊戲執行中會鎖住檔案,用共享模式讀取
   $fs = [IO.File]::Open($path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]'ReadWrite, Delete')
